@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.dockerignore
+**/.gitignore
+**/.git/
+**/Dockerfile*
+**/docker-compose*
+**/README.md
+**/.env
+**/*.log
