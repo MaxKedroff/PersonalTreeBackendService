@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,15 +28,16 @@ var app = builder.Build();
 //}
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+
+app.UseSwagger(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "StockParser API V1");
-        c.RoutePrefix = "swagger";
-    });
-}
+    c.RouteTemplate = "api/swagger/{documentName}/swagger.json";
+});
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/api/swagger/v1/swagger.json", "PersonTree API V1");
+    c.RoutePrefix = "api/swagger";
+});
 
 app.UseCors(builder => builder
     .AllowAnyOrigin()

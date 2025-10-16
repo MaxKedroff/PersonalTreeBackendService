@@ -11,24 +11,24 @@ public class WeatherForecastController : ControllerBase
     [HttpGet("test")]
     public IActionResult Get()
     {
-        return Ok("Йоу - это гет");
+        return Ok("Р№РѕСѓ - СЌС‚Рѕ РіРµС‚");
     }
     [HttpPost("test")]
     public IActionResult Post()
     {
-        return Ok("йоу - это пост");
+        return Ok("Р№РѕСѓ - СЌС‚Рѕ РїРѕСЃС‚");
     }
 
     [HttpPut("test")]
     public IActionResult Put()
     {
-        return Ok("йоу - это пут");
+        return Ok("Р№РѕСѓ - СЌС‚Рѕ РїСѓС‚");
     }
 
     [HttpDelete("test")]
     public IActionResult Delete()
     {
-        return Ok("йоу - это делете");
+        return Ok("Р№РѕСѓ - СЌС‚Рѕ РґРµР»РµС‚Рµ");
     }
 
 }
