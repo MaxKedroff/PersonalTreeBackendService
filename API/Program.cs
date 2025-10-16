@@ -39,6 +39,16 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "api/swagger";
 });
 
+app.MapWhen(context => context.Request.Path == "/api/", appBuilder =>
+{
+    appBuilder.Run(async context =>
+    {
+        context.Response.Redirect("/api/swagger");
+        await Task.CompletedTask;
+    });
+});
+
+
 app.UseCors(builder => builder
     .AllowAnyOrigin()
     .AllowAnyMethod()
