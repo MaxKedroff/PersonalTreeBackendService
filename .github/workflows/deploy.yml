@@ -58,6 +58,6 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no $REMOTE_USER@$REMOTE_HOST \
           "docker pull $DOCKERHUB_USERNAME/persontree-backend:latest && \
-          cd /home/admin-tracker/PersonTree/Backend && \
+          cd /home/admin-tree/PersonTree/Backend && \
           docker-compose down && \
           docker-compose up -d"
