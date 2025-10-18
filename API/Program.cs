@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Prometheus;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,7 +48,8 @@ app.MapWhen(context => context.Request.Path == "/api/", appBuilder =>
         await Task.CompletedTask;
     });
 });
-
+app.UseRouting();
+app.UseHttpMetrics();
 
 app.UseCors(builder => builder
     .AllowAnyOrigin()
@@ -61,4 +63,6 @@ app.UseCors(builder => builder
 //app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapMetrics("/metrics");
 app.Run();
