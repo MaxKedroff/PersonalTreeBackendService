@@ -21,15 +21,25 @@ namespace Domain.Entities
         public string Login { get; set; }
         [Required]
         public string Password { get; set; }
-        public Guid Manager_id { get; set; }
+        public Guid? Manager_id { get; set; }
         public bool Is_admin { get; set; }
         public PersonalInfo PersonalInfo { get; set; } = new PersonalInfo();
         public WorkInfo WorkInfo { get; set; } = new WorkInfo();
         public ContactInfo ContactInfo { get; set; } = new ContactInfo();
         [Column(TypeName = "jsonb")]
         public JObject Contacts { get; set; } = new JObject();
+
+        public string SamAccountName { get; set; } // Уникальный идентификатор из AD
+        public string Email { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime LastAdSync { get; set; }
+        public string AdGuid { get; set; }
+
         public DateTime Created_at { get; set; }
         public DateTime Updated_at { get; set; }
+
+        public User Manager { get; set; }
+        public ICollection<User> Subordinates { get; set; } = new List<User>();
 
         public void SetContact<T>(string key, T value)
         {
