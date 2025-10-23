@@ -18,16 +18,24 @@ namespace Application.Dtos
 
     public class UserTreeDto
     {
-        public UserTreeDto? Manager { get; set; } = new();
+        public Guid? ManagerId { get; set; }
+        public string ManagerName { get; set; }
 
-        public List<UserTreeDto> Subordinates { get; set; } = new();
+        public List<UserTreeItemDto> Subordinates { get; set; } = new();
 
         public string UserName { get; set; }
-
-        public string? Position  { get; set; }
-
+        public string? Position { get; set; }
         public string? Department { get; set; }
-
         public string? AvatarUrl { get; set; }
+        public Guid UserId { get; set; }
+    }
+
+    public class UserTreeItemDto
+    {
+        public string UserName { get; set; }
+        public string? Position { get; set; }
+        public string? Department { get; set; }
+        public string? AvatarUrl { get; set; }
+        public Guid UserId { get; set; }
     }
 }

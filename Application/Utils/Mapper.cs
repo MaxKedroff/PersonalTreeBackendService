@@ -18,14 +18,23 @@ namespace Application.Utils
 
             return new UserTreeDto
             {
-                Manager = user.Manager != null ? MapUserToUserTreeDto(user.Manager) : null,
-                Subordinates = user.Subordinates?.Select(sub => MapUserToUserTreeDto(sub))
-                .ToList() ?? new List<UserTreeDto>(),
-
+                UserId = user.User_id,
                 UserName = user.GetFullName() ?? user.Login,
                 Position = user.WorkInfo?.Position,
                 Department = user.WorkInfo?.Department,
-                AvatarUrl = user.ContactInfo?.Avatar
+                AvatarUrl = user.ContactInfo?.Avatar,
+                ManagerId = user.Manager_id,
+                ManagerName = user.Manager?.GetFullName() ?? user.Manager?.Login,
+                Subordinates = user.Subordinates?
+                .Select(sub => new UserTreeItemDto
+                {
+                    UserId = sub.User_id,
+                    UserName = sub.GetFullName() ?? sub.Login,
+                    Position = sub.WorkInfo?.Position,
+                    Department = sub.WorkInfo?.Department,
+                    AvatarUrl = sub.ContactInfo?.Avatar
+                })
+                .ToList() ?? new List<UserTreeItemDto>()
             };
         }
     }
