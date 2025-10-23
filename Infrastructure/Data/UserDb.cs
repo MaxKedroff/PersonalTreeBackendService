@@ -15,6 +15,9 @@ namespace Infrastructure.Data
     {
         public DbSet<User> Users { get; set; }
 
+        public UserDb(DbContextOptions<UserDb> options) : base(options)
+        {
+        }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<User>(entity =>
