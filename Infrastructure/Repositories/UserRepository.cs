@@ -22,13 +22,18 @@ namespace Infrastructure.Repositories
 
         public async Task<List<User>> GetUsersAsync()
         {
+            // Сначала проверим без Include
+            var simpleUsers = await _context.Users.ToListAsync();
+            Console.WriteLine($"Simple query found {simpleUsers.Count} users");
+
+            // Затем с Include
             return await _context.Users
-            .Include(u => u.Manager)
-            .Include(u => u.Subordinates)
-            .Include(u => u.PersonalInfo)
-            .Include(u => u.WorkInfo)
-            .Include(u => u.ContactInfo)
-            .ToListAsync();
+                .Include(u => u.Manager)
+                .Include(u => u.Subordinates)
+                .Include(u => u.PersonalInfo)
+                .Include(u => u.WorkInfo)
+                .Include(u => u.ContactInfo)
+                .ToListAsync();
         }
 
         public async Task<User> GetUsersByIdAsync(Guid UserId)
