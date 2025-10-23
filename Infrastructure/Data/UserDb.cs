@@ -24,6 +24,12 @@ namespace Infrastructure.Data
             {
                 entity.ToTable("users");
                 entity.HasKey(e => e.User_id);
+
+                entity.HasOne(u => u.Manager)
+                 .WithMany(u => u.Subordinates)
+                 .HasForeignKey(u => u.Manager_id)  
+                 .IsRequired(false);
+
                 entity.OwnsOne(e => e.PersonalInfo, personal =>
                 {
                     personal.Property(p => p.Last_name)
