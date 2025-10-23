@@ -1,12 +1,13 @@
 ﻿using Prometheus;
+using Application;
 using System;
+using Application.Utils;
+using Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors();
 
@@ -19,14 +20,16 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddApplicationServices(builder.Configuration);
+
 
 var app = builder.Build();
 
-//using (var scope = app.Services.CreateScope())
-//{
-//    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-//    dbContext.Database.Migrate();
-//}
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<UserDb>();
+    dbContext.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 
