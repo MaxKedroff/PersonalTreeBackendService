@@ -1,4 +1,5 @@
 ﻿using Domain.Entities;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,5 +38,30 @@ namespace Application.Dtos
         public string? Department { get; set; }
         public string? AvatarUrl { get; set; }
         public Guid UserId { get; set; }
+    }
+
+    public class UserDetailInfoDto
+    {
+        public Guid User_id { get; set; }
+
+        public string UserName { get; set; }
+
+        public DateTime BornDate { get; set; }
+
+        public string Department { get; set; }
+
+        public string Position { get; set; }
+
+        public DateTime WorkExperience { get; set; }
+
+        public string PhoneNumber { get; set; }
+
+        public string City { get; set; }
+
+        public string Interests { get; set; }
+
+        public string avatar { get; set; }
+
+        public JObject Contacts { get; set; } = new JObject();
     }
 }

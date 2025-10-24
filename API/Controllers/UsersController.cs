@@ -24,5 +24,12 @@ namespace API.Controllers
             var result = await _userService.GetUsersAsync();
             return Ok(result);
         }
+
+        [HttpGet("{userId}")]
+        public async Task<ActionResult<UserDetailInfoDto>> GetUserById(Guid userId)
+        {
+            var result = await _userService.GetUserDetailAsync(userId);
+            return Ok(result);
+        }
     }
 }

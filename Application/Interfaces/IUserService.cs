@@ -11,5 +11,7 @@ namespace Application.Interfaces
     {
 
         Task<ResponseUsersTreeDto> GetUsersAsync(bool isCached = false);
+
+        Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId);
     }
 }

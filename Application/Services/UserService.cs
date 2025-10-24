@@ -21,6 +21,12 @@ namespace Application.Services
             _userRepository = userRepository;
         }
 
+        public async Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId)
+        {
+            var user = await _userRepository.GetUsersByIdAsync(userId);
+            return Mapper.MapUserToUserDetailInfoDto(user);
+        }
+
         public async Task<ResponseUsersTreeDto> GetUsersAsync(bool isCached = false)
         {
             var users = await _userRepository.GetUsersAsync();
@@ -32,5 +38,7 @@ namespace Application.Services
             };
             return response;
         }
+
+
     }
 }
