@@ -12,5 +12,7 @@ namespace Domain.Interfaces
         Task<List<User>> GetUsersAsync();
 
         Task<User> GetUsersByIdAsync(Guid UserId);
+
+        Task<List<User>> GetSearchResultAsync(string criteria, string searchString, int queryAmount);
     }
 }

@@ -31,5 +31,19 @@ namespace API.Controllers
             var result = await _userService.GetUserDetailAsync(userId);
             return Ok(result);
         }
+
+        [HttpGet("search")]
+        public async Task<ActionResult<SearchResponseDto>> SearchItems([FromBody] SearchRequestDto request)
+        {
+            try
+            {
+                var result = await _userService.GetSearchResultAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred during search" });
+            }
+        }
     }
 }

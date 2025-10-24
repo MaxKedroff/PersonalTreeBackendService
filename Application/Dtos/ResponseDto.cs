@@ -64,4 +64,19 @@ namespace Application.Dtos
 
         public JObject Contacts { get; set; } = new JObject();
     }
+
+    public class SearchResponseDto
+    {
+        public int amount;
+        public List<SearchItemDto> searchItems;
+        public bool is_cached = false;
+    }
+
+    public class SearchItemDto
+    {
+        public string username;
+        public string department;
+        public string position;
+    }
+
 }

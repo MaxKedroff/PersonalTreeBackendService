@@ -21,6 +21,39 @@ namespace Application.Services
             _userRepository = userRepository;
         }
 
+        public async Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentException(nameof(request));
+            }
+
+            if (string.IsNullOrWhiteSpace(request.searchValue))
+                return new SearchResponseDto
+                {
+                    amount = 0,
+                    searchItems = new List<SearchItemDto>(),
+                    is_cached = false
+                };
+
+            var queryAmount = request.queryAmount > 0 ? request.queryAmount : 10;
+
+            var users = await _userRepository.GetSearchResultAsync(request.searchCriteria, request.searchValue, request.queryAmount);
+            var searchItems = users.Select(user => new SearchItemDto
+            {
+                username = user.GetFullName() ?? user.Login,
+                department = user.WorkInfo?.Department ?? string.Empty,
+                position = user.WorkInfo?.Position ?? string.Empty
+            }).ToList();
+
+            return new SearchResponseDto
+            {
+                amount = searchItems.Count,
+                searchItems = searchItems,
+                is_cached = false
+            };
+        }
+
         public async Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId)
         {
             var user = await _userRepository.GetUsersByIdAsync(userId);
