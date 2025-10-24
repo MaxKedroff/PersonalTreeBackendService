@@ -32,7 +32,7 @@ namespace API.Controllers
             return Ok(result);
         }
 
-        [HttpGet("search")]
+        [HttpPost("search")]
         public async Task<ActionResult<SearchResponseDto>> SearchItems([FromBody] SearchRequestDto request)
         {
             try
