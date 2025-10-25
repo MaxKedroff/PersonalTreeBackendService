@@ -44,6 +44,12 @@ namespace Application.Services
                         .Select(emp => Mapper.MapEmployeeToHierarchyDto(emp, allUsers))
                         .ToList()
                 }).ToList();
+
+            response.Departments = departments;
+            response.TotalEmployees = allUsers.Count;
+
+            return response;
+
         }
 
         public async Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request)
