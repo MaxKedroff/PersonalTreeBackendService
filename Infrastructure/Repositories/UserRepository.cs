@@ -79,5 +79,36 @@ namespace Infrastructure.Repositories
             .Include(u => u.ContactInfo)
             .FirstOrDefaultAsync(u => u.User_id == UserId);
         }
+
+        public async Task<List<User>> GetUsersWithHierarchyAsync()
+        {
+            return await _context.Users
+                .Include(u => u.PersonalInfo)
+                .Include(u => u.WorkInfo)
+                .Include(u => u.ContactInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.PersonalInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.WorkInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.ContactInfo)
+                .Where(u => u.IsActive)
+                .ToListAsync();
+        }
+
+        public async Task<User> GetCeoAsync()
+        {
+            return await _context.Users
+                .Include(u => u.PersonalInfo)
+                .Include(u => u.WorkInfo)
+                .Include(u => u.ContactInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.PersonalInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.WorkInfo)
+                .Include(u => u.Subordinates)
+                    .ThenInclude(sub => sub.ContactInfo)
+                .FirstOrDefaultAsync(u => u.Manager_id == null && u.IsActive);
+        }
     }
 }

@@ -15,5 +15,7 @@ namespace Application.Interfaces
         Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId);
 
         Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request);
+
+        Task<HierarchyResponseDto> GetDepartmentHierarchyAsync();
     }
 }

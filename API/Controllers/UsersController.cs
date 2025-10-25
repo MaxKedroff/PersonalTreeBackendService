@@ -45,5 +45,27 @@ namespace API.Controllers
                 return StatusCode(500, new { message = "An error occurred during search" });
             }
         }
+
+        [HttpGet("hierarchy")]
+        [ProducesResponseType(typeof(HierarchyResponseDto), 200)]
+        [ProducesResponseType(404)]
+        public async Task<ActionResult<HierarchyResponseDto>> GetDepartmentHierarchy()
+        {
+            try
+            {
+                var hierarchy = await _userService.GetDepartmentHierarchyAsync();
+
+                if (hierarchy?.Ceo == null && hierarchy?.Departments?.Count == 0)
+                {
+                    return NotFound("No organizational hierarchy found");
+                }
+
+                return Ok(hierarchy);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while retrieving organizational hierarchy" });
+            }
+        }
     }
 }

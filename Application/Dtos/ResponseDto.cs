@@ -79,4 +79,27 @@ namespace Application.Dtos
         public string position;
     }
 
+
+    public class DepartmentHierarchyDto
+    {
+        public string Department { get; set; }
+        public List<EmployeeHierarchyDto> Employees { get; set; } = new List<EmployeeHierarchyDto>();
+    }
+
+    public class EmployeeHierarchyDto
+    {
+        public Guid UserId { get; set; }
+        public string UserName { get; set; }
+        public string Position { get; set; }
+        public string AvatarUrl { get; set; }
+        public List<EmployeeHierarchyDto> Subordinates { get; set; } = new List<EmployeeHierarchyDto>();
+    }
+
+    public class HierarchyResponseDto
+    {
+        public EmployeeHierarchyDto Ceo { get; set; }
+        public List<DepartmentHierarchyDto> Departments { get; set; } = new List<DepartmentHierarchyDto>();
+        public int TotalEmployees { get; set; }
+    }
+
 }

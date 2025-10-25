@@ -21,6 +21,31 @@ namespace Application.Services
             _userRepository = userRepository;
         }
 
+        public async Task<HierarchyResponseDto> GetDepartmentHierarchyAsync()
+        {
+            var ceo = await _userRepository.GetCeoAsync();
+            var allUsers = await _userRepository.GetUsersWithHierarchyAsync();
+
+            var response = new HierarchyResponseDto();
+
+            if (ceo != null)
+            {
+                response.Ceo = Mapper.MapEmployeeToHierarchyDto(ceo, allUsers);
+            }
+
+            var departments = allUsers
+                .Where(u => u.User_id != ceo?.User_id && !string.IsNullOrEmpty(u.WorkInfo?.Department))
+                .GroupBy(u => u.WorkInfo.Department)
+                .Select(g => new DepartmentHierarchyDto
+                {
+                    Department = g.Key,
+                    Employees = g.Where(u => u.Manager_id == ceo?.User_id ||
+                                   !allUsers.Any(m => m.User_id == u.Manager_id && m.WorkInfo?.Department == g.Key))
+                        .Select(emp => Mapper.MapEmployeeToHierarchyDto(emp, allUsers))
+                        .ToList()
+                }).ToList();
+        }
+
         public async Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request)
         {
             if (request == null)

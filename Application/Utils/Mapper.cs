@@ -59,5 +59,44 @@ namespace Application.Utils
                 Contacts = user.Contacts ?? new JObject()
             };
         }
+
+        public static EmployeeHierarchyDto MapEmployeeToHierarchyDto(User user, List<User> allUsers, HashSet<Guid> processedUsers = null, int maxDepth = 10)
+        {
+            if (user == null) return null;
+
+            processedUsers ??= new HashSet<Guid>();
+
+            // Защита от циклических ссылок
+            if (processedUsers.Contains(user.User_id) || maxDepth <= 0)
+                return null;
+
+            processedUsers.Add(user.User_id);
+
+            var dto = new EmployeeHierarchyDto
+            {
+                UserId = user.User_id,
+                UserName = user.GetFullName() ?? user.Login,
+                Position = user.WorkInfo?.Position,
+                AvatarUrl = user.ContactInfo?.Avatar
+            };
+
+            // Рекурсивно маппим подчиненных
+            var subordinates = allUsers
+                .Where(u => u.Manager_id == user.User_id &&
+                           u.WorkInfo?.Department == user.WorkInfo?.Department)
+                .ToList();
+
+            foreach (var subordinate in subordinates)
+            {
+                var subordinateDto = MapEmployeeToHierarchyDto(subordinate, allUsers, processedUsers, maxDepth - 1);
+                if (subordinateDto != null)
+                {
+                    dto.Subordinates.Add(subordinateDto);
+                }
+            }
+
+            processedUsers.Remove(user.User_id);
+            return dto;
+        }
     }
 }
