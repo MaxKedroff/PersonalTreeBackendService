@@ -1,186 +1,318 @@
-﻿//using Domain.Entities;
-//using Microsoft.Extensions.Configuration;
-//using System.DirectoryServices;
-//using System.DirectoryServices.AccountManagement;
+﻿using Domain.Entities;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Novell.Directory.Ldap;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-//using Microsoft.Extensions.Logging;
-//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Text;
-//using System.Threading.Tasks;
-//using Novell.Directory.Ldap;
+namespace Infrastructure.ActiveDirectory
+{
+    public class LdapService : ILdapService
+    {
+        private readonly IConfiguration _configuration;
 
-//namespace Infrastructure.ActiveDirectory
-//{
-//    class LdapService : ILdapService
-//    {
+        public LdapService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
-//        private readonly IConfiguration _configuration;
+        private LdapConnection GetConnection()
+        {
+            var connection = new LdapConnection();
+            return connection;
+        }
 
-//        public LdapService(IConfiguration configuration)
-//        {
-//            _configuration = configuration;
-//        }
+        private void ConnectAndBind(LdapConnection connection)
+        {
+            var server = _configuration["Ldap:Server"] ?? "stud.local";
+            var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
+            var username = _configuration["Ldap:Username"] ?? "";
+            var password = _configuration["Ldap:Password"] ?? "";
 
-//        public async Task<User> GetUserBySamAccountNameAsync(string samAccountName)
-//        {
-//            return await Task.Run(() =>
-//            {
-//                try
-//                {
-//                    using var connection = new LdapConnection();
-//                    connection.Connect("stud.local", 389);
-//                    connection.Bind(LdapConnection.Ldap_V3,
-//                        _configuration["Ldap:Username"] ?? "",
-//                        _configuration["Ldap:Password"] ?? "");
+            try
+            {
+                connection.Connect(server, port);
+                connection.Bind(LdapConnection.Ldap_V3, username, password);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
 
-//                    var searchFilter = $"(sAMAccountName={samAccountName})";
-//                    var attributes = new[] {
-//                        "sAMAccountName", "displayName", "mail", "title", "department",
-//                        "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
-//                        "givenName", "sn", "initials", "whenCreated", "employeeID",
-//                        "distinguishedName", "objectGUID", "userAccountControl",
-//                        "company", "description", "officePhone", "mobile", "streetAddress",
-//                        "postalCode", "co", "userPrincipalName", "memberOf"
-//                    };
+        public async Task<User> GetUserBySamAccountNameAsync(string samAccountName)
+        {
+            return await Task.Run(() =>
+            {
+                LdapConnection connection = null;
+                try
+                {
+                    connection = GetConnection();
+                    ConnectAndBind(connection);
 
-//                    var searchResults = connection.Search(
-//                        "DC=stud,DC=local",
-//                        LdapConnection.SCOPE_SUB,
-//                        searchFilter,
-//                        attributes,
-//                        false
-//                    );
+                    var searchFilter = $"(sAMAccountName={EscapeLdapFilter(samAccountName)})";
+                    var attributes = new[] {
+                        "sAMAccountName", "displayName", "mail", "title", "department",
+                        "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
+                        "givenName", "sn", "initials", "whenCreated", "employeeID",
+                        "distinguishedName", "objectGUID", "userAccountControl",
+                        "company", "description", "officePhone", "mobile", "streetAddress",
+                        "postalCode", "co", "userPrincipalName", "memberOf"
+                    };
 
-//                    if (searchResults.hasMore())
-//                    {
-//                        var entry = searchResults.next();
-//                        return MapLdapEntryToUser(entry);
-//                    }
+                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
 
-//                    return null;
-//                }
-//                catch (Exception ex)
-//                {
-//                    return null;
-//                }
-//            });
-//        }
+                    var searchResults = connection.Search(
+                        searchBase,
+                        LdapConnection.SCOPE_SUB,
+                        searchFilter,
+                        attributes,
+                        false
+                    );
 
-//        public async Task<List<User>> GetUsersFromActiveDirectoryAsync()
-//        {
-//            return await Task.Run(() =>
-//            {
-//                var users = new List<User>();
-//                LdapConnection connection = null;
+                    if (searchResults.hasMore())
+                    {
+                        var entry = searchResults.next();
+                        return MapLdapEntryToUser(entry);
+                    }
 
-//                try
-//                {
-//                    using var connection = new LdapConnection();
-//                    connection.Connect("stud.local", 389);
+                    return null;
+                }
+                catch (Exception ex)
+                {
+                    return null;
+                }
+                finally
+                {
+                    connection?.Disconnect();
+                }
+            });
+        }
 
-//                    connection.Bind(LdapConnection.Ldap_V3, _configuration["Ldap:Username"] ?? "", _configuration["Ldap:Password"] ?? "");
+        public async Task<List<User>> GetUsersFromActiveDirectoryAsync()
+        {
+            return await Task.Run(() =>
+            {
+                var users = new List<User>();
+                LdapConnection connection = null;
 
-//                    var searchFilter = "(&(objectClass=user)(objectCategory=person))";
-//                    var attributes = new[] {
-//                        "sAMAccountName", "displayName", "mail", "title", "department",
-//                        "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
-//                        "givenName", "sn", "initials", "whenCreated", "employeeID",
-//                        "distinguishedName", "objectGUID", "userAccountControl"
-//                    };
-//                    var searchResults = connection.Search(
-//                        "DC=stud,DC=local", 
-//                        LdapConnection.SCOPE_SUB,
-//                        searchFilter,
-//                        attributes,
-//                        false
-//                    );
-//                    while (searchResults.hasMore())
-//                    {
-//                        try
-//                        {
-//                            var entry = searchResults.next();
-//                            var user = MapLdapEntryToUser(entry);
-//                            if (user != null)
-//                                users.Add(user);
-//                        }
-//                        catch (Exception ex)
-//                        {
+                try
+                {
+                    connection = GetConnection();
+                    ConnectAndBind(connection);
 
-//                        }
-//                    }
+                    var searchFilter = "(&(objectClass=user)(objectCategory=person))";
+                    var attributes = new[] {
+                        "sAMAccountName", "displayName", "mail", "title", "department",
+                        "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
+                        "givenName", "sn", "initials", "whenCreated", "employeeID",
+                        "distinguishedName", "objectGUID", "userAccountControl",
+                        "company", "description", "officePhone", "mobile"
+                    };
 
-//                    connection.Disconnect();
+                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
 
+                    var searchResults = connection.Search(
+                        searchBase,
+                        LdapConnection.SCOPE_SUB,
+                        searchFilter,
+                        attributes,
+                        false
+                    );
 
+                    while (searchResults.hasMore())
+                    {
+                        try
+                        {
+                            var entry = searchResults.next();
+                            var user = MapLdapEntryToUser(entry);
+                            if (user != null)
+                                users.Add(user);
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    }
 
-//                }
-//                catch (Exception ex)
-//                {
-//                    throw;
-//                }
-//                return users;
-//            });
-//        }
+                    return users;
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+                finally
+                {
+                    connection?.Disconnect();
+                }
+            });
+        }
 
-//        private User MapLdapEntryToUser(LdapEntry entry)
-//        {
-//            var attributes = entry.getAttributeSet();
+        public async Task<LdapHierarchyResponse> GetLdapHierarchyAsync()
+        {
+            return await Task.Run(() =>
+            {
+                LdapConnection connection = null;
+                try
+                {
+                    connection = GetConnection();
+                    ConnectAndBind(connection);
 
-//            var samAccountName = LdapHelper.GetAttributeValue(attributes, "SamAccountName");
-//            if (string.IsNullOrEmpty(samAccountName)) return null;
+                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
 
-//            var userAccountControl = LdapHelper.GetAttributeValue(attributes, "userAccountControl");
+                    // Получаем организационные единицы
+                    var ouResults = connection.Search(
+                        searchBase,
+                        LdapConnection.SCOPE_SUB,
+                        "(objectClass=organizationalUnit)",
+                        new[] { "ou", "description", "distinguishedName" },
+                        false
+                    );
 
-//            var isActive = LdapHelper.IsUserActive(userAccountControl);
-//            if (!isActive)
-//            {
-//                return null;
-//            }
+                    var ous = new List<LdapOrganizationalUnit>();
+                    while (ouResults.hasMore())
+                    {
+                        try
+                        {
+                            var entry = ouResults.next();
+                            var attributes = entry.getAttributeSet();
 
-//            var whenCreated = LdapHelper.ParseLdapDate(LdapHelper.GetAttributeValue(attributes, "whenCreated");
+                            ous.Add(new LdapOrganizationalUnit
+                            {
+                                Name = LdapHelper.GetAttributeValue(attributes, "ou"),
+                                Description = LdapHelper.GetAttributeValue(attributes, "description"),
+                                DistinguishedName = LdapHelper.GetAttributeValue(attributes, "distinguishedName")
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    }
 
-//            var pwdLastSet = LdapHelper.ParseWindowsFileTime(LdapHelper.GetAttributeValue(attributes, "pwdLastSet"));
+                    // Получаем пользователей с информацией о подразделениях
+                    var userResults = connection.Search(
+                        searchBase,
+                        LdapConnection.SCOPE_SUB,
+                        "(&(objectClass=user)(objectCategory=person))",
+                        new[] {
+                            "sAMAccountName", "displayName", "title", "department",
+                            "manager", "distinguishedName", "userAccountControl",
+                            "givenName", "sn", "mail", "telephoneNumber", "physicalDeliveryOfficeName"
+                        },
+                        false
+                    );
 
-//            var user = new User
-//            {
-//                SamAccountName = samAccountName,
-//                Email = LdapHelper.GetAttributeValue(attributes, "mail") ?? LdapHelper.GetAttributeValue(attributes, "userPrincipalName"),
-//                Login = samAccountName,
-//                Password = "LDAP_SYNCED_USER",
-//                IsActive = isActive,
-//                LastAdSync = DateTime.UtcNow,
-//                //AdGuid = LdapHelper.GetGuidFromBytes(attributes.getAttribute("objectGUID")?.ByteValue),
-//                PersonalInfo = new PersonalInfo
-//                {
-//                    Last_name = LdapHelper.GetAttributeValue(attributes, "sn") ?? "",
-//                    First_name = LdapHelper.GetAttributeValue(attributes, "givenName") ??
-//                                LdapHelper.GetAttributeValue(attributes, "displayName")?.Split(' ')[0] ?? "",
-//                    Patronymic = LdapHelper.GetAttributeValue(attributes, "initials") ?? "",
-//                    Birth_date = whenCreated?.AddYears(-25) ?? DateTime.Now.AddYears(-25), // нет даты рождения
-//                    Interests = LdapHelper.GetAttributeValue(attributes, "description") ?? ""
+                    var users = new List<LdapUserInfo>();
+                    while (userResults.hasMore())
+                    {
+                        try
+                        {
+                            var entry = userResults.next();
+                            var attributes = entry.getAttributeSet();
 
-//                },
-//                WorkInfo = new WorkInfo
-//                {
-//                    Position = LdapHelper.GetAttributeValue(attributes, "title") ?? "Employee",
-//                    Department = LdapHelper.GetAttributeValue(attributes, "department") ?? "General",
-//                    Work_exp = whenCreated ?? DateTime.Now.AddYears(-1)
-//                },
-//                ContactInfo = new ContactInfo
-//                {
-//                    Phone = LdapHelper.GetAttributeValue(attributes, "telephoneNumber") ??
-//                           LdapHelper.GetAttributeValue(attributes, "officePhone") ?? "",
-//                    City = LdapHelper.GetAttributeValue(attributes, "l") ??
-//                          LdapHelper.GetAttributeValue(attributes, "co") ??
-//                          LdapHelper.GetAttributeValue(attributes, "physicalDeliveryOfficeName")
-//                },
-//                Created_at = DateTime.UtcNow,
-//                Updated_at = DateTime.UtcNow
-//            };
-//            return user;
+                            var userAccountControl = LdapHelper.GetAttributeValue(attributes, "userAccountControl");
+                            if (!LdapHelper.IsUserActive(userAccountControl))
+                                continue;
 
-//        } 
-//    }
-//}
+                            users.Add(new LdapUserInfo
+                            {
+                                SamAccountName = LdapHelper.GetAttributeValue(attributes, "sAMAccountName"),
+                                DisplayName = LdapHelper.GetAttributeValue(attributes, "displayName"),
+                                FirstName = LdapHelper.GetAttributeValue(attributes, "givenName"),
+                                LastName = LdapHelper.GetAttributeValue(attributes, "sn"),
+                                Title = LdapHelper.GetAttributeValue(attributes, "title"),
+                                Department = LdapHelper.GetAttributeValue(attributes, "department"),
+                                Manager = LdapHelper.GetAttributeValue(attributes, "manager"),
+                                Email = LdapHelper.GetAttributeValue(attributes, "mail"),
+                                Phone = LdapHelper.GetAttributeValue(attributes, "telephoneNumber"),
+                                Office = LdapHelper.GetAttributeValue(attributes, "physicalDeliveryOfficeName"),
+                                DistinguishedName = LdapHelper.GetAttributeValue(attributes, "distinguishedName")
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                    }
+
+                    return new LdapHierarchyResponse
+                    {
+                        OrganizationalUnits = ous,
+                        Users = users,
+                        TotalUsers = users.Count,
+                        TotalOUs = ous.Count
+                    };
+                }
+                catch (Exception ex)
+                {
+                    throw;
+                }
+                finally
+                {
+                    connection?.Disconnect();
+                }
+            });
+        }
+
+        private User MapLdapEntryToUser(LdapEntry entry)
+        {
+            var attributes = entry.getAttributeSet();
+
+            var samAccountName = LdapHelper.GetAttributeValue(attributes, "sAMAccountName");
+            if (string.IsNullOrEmpty(samAccountName)) return null;
+
+            var userAccountControl = LdapHelper.GetAttributeValue(attributes, "userAccountControl");
+            var isActive = LdapHelper.IsUserActive(userAccountControl);
+            if (!isActive) return null;
+
+            var whenCreated = LdapHelper.ParseLdapDate(LdapHelper.GetAttributeValue(attributes, "whenCreated"));
+
+            return new User
+            {
+                SamAccountName = samAccountName,
+                Email = LdapHelper.GetAttributeValue(attributes, "mail") ?? LdapHelper.GetAttributeValue(attributes, "userPrincipalName"),
+                Login = samAccountName,
+                Password = "LDAP_SYNCED_USER",
+                IsActive = isActive,
+                LastAdSync = DateTime.UtcNow,
+                PersonalInfo = new PersonalInfo
+                {
+                    Last_name = LdapHelper.GetAttributeValue(attributes, "sn") ?? "",
+                    First_name = LdapHelper.GetAttributeValue(attributes, "givenName") ??
+                                LdapHelper.GetAttributeValue(attributes, "displayName")?.Split(' ')[0] ?? "",
+                    Patronymic = LdapHelper.GetAttributeValue(attributes, "initials") ?? "",
+                    Birth_date = whenCreated?.AddYears(-25) ?? DateTime.UtcNow.AddYears(-25),
+                    Interests = LdapHelper.GetAttributeValue(attributes, "description") ?? ""
+                },
+                WorkInfo = new WorkInfo
+                {
+                    Position = LdapHelper.GetAttributeValue(attributes, "title") ?? "Employee",
+                    Department = LdapHelper.GetAttributeValue(attributes, "department") ?? "General",
+                    Work_exp = whenCreated ?? DateTime.UtcNow.AddYears(-1)
+                },
+                ContactInfo = new ContactInfo
+                {
+                    Phone = LdapHelper.GetAttributeValue(attributes, "telephoneNumber") ??
+                           LdapHelper.GetAttributeValue(attributes, "officePhone") ?? "",
+                    City = LdapHelper.GetAttributeValue(attributes, "l") ??
+                          LdapHelper.GetAttributeValue(attributes, "co") ??
+                          LdapHelper.GetAttributeValue(attributes, "physicalDeliveryOfficeName") ?? ""
+                },
+                Created_at = DateTime.UtcNow,
+                Updated_at = DateTime.UtcNow
+            };
+        }
+
+        private string EscapeLdapFilter(string filter)
+        {
+            if (string.IsNullOrEmpty(filter)) return string.Empty;
+
+            return filter
+                .Replace("\\", "\\5c")
+                .Replace("*", "\\2a")
+                .Replace("(", "\\28")
+                .Replace(")", "\\29")
+                .Replace("\0", "\\00");
+        }
+    }
+}

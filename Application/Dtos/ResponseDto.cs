@@ -101,5 +101,4 @@ namespace Application.Dtos
         public List<DepartmentHierarchyDto> Departments { get; set; } = new List<DepartmentHierarchyDto>();
         public int TotalEmployees { get; set; }
     }
-
 }

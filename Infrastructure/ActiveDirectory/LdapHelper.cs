@@ -1,13 +1,9 @@
 ﻿using Novell.Directory.Ldap;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Infrastructure.ActiveDirectory
 {
-    public class LdapHelper
+    public static class LdapHelper
     {
         public static string GetAttributeValue(LdapAttributeSet attributes, string attributeName)
         {
@@ -56,7 +52,6 @@ namespace Infrastructure.ActiveDirectory
             if (string.IsNullOrEmpty(fileTimeString) || !long.TryParse(fileTimeString, out long fileTime))
                 return null;
 
-            // Windows file time to DateTime
             try
             {
                 return DateTime.FromFileTime(fileTime);
@@ -66,20 +61,5 @@ namespace Infrastructure.ActiveDirectory
                 return null;
             }
         }
-
-        //public static string GetGuidFromBytes(sbyte[] guidBytes)
-        //{
-        //    if (guidBytes == null || guidBytes.Length != 16) return null;
-
-        //    try
-        //    {
-        //        var guid = new Guid(byte.Parse(guidBytes));
-        //        return guid.ToString();
-        //    }
-        //    catch
-        //    {
-        //        return null;
-        //    }
-        //}
     }
 }

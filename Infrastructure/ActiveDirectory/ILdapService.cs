@@ -9,7 +9,8 @@ namespace Infrastructure.ActiveDirectory
 {
     public interface ILdapService
     {
-        Task<List<User>> GetUsersFromActiveDirectoryAsync();
         Task<User> GetUserBySamAccountNameAsync(string samAccountName);
+        Task<List<User>> GetUsersFromActiveDirectoryAsync();
+        Task<LdapHierarchyResponse> GetLdapHierarchyAsync();
     }
 }
