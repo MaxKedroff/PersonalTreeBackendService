@@ -1,6 +1,7 @@
 ﻿using Application.Interfaces;
 using Application.Services;
 using Domain.Interfaces;
+using Infrastructure.ActiveDirectory;
 using Infrastructure.Data;
 using Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,7 @@ namespace Application.Utils
 
             // Services
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<ILdapService, LdapService>();
             return services;
         }
     }
