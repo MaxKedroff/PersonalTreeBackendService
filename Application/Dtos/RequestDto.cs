@@ -21,11 +21,11 @@ namespace Application.Dtos
     {
         public int page { get; set; } = 1;
         public int Limit { get; set; } = 10;
-        public string Sort { get; set; }
+        public string? Sort { get; set; }
 
         // Раздельные фильтры
-        public string PositionFilter { get; set; }
-        public string DepartmentFilter { get; set; }
+        public string? PositionFilter { get; set; }
+        public string? DepartmentFilter { get; set; }
 
         public bool isCached { get; set; } = false;
     }
