@@ -18,9 +18,23 @@ namespace API.Controllers
             _userService = userService;
         }
 
-        [HttpPost]
-        public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromBody] TableRequestDto request)
+        [HttpGet]
+        public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromQuery] int page = 1,
+            [FromQuery] int limit = 10,
+            [FromQuery] string? sort = null,
+            [FromQuery] string? positionFilter = null,
+            [FromQuery] string? departmentFilter = null,
+            [FromQuery] bool isCached = false)
         {
+            var request = new TableRequestDto
+            {
+                page = page,
+                Limit = limit,
+                Sort = sort,
+                PositionFilter = positionFilter,
+                DepartmentFilter = departmentFilter,
+                isCached = isCached
+            };
             var result = await _userService.GetUserTableAsync(request);
             return Ok(result);
         }
