@@ -18,7 +18,7 @@ namespace API.Controllers
             _userService = userService;
         }
 
-        [HttpGet]
+        [HttpPost]
         public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromBody] TableRequestDto request)
         {
             var result = await _userService.GetUserTableAsync(request);
