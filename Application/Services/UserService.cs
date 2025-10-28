@@ -93,8 +93,13 @@ namespace Application.Services
 
         public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
+            Console.WriteLine($"=== GetUserTableAsync START ===");
+            Console.WriteLine($"Request: page={request.page}, Limit={request.Limit}, " +
+                             $"PositionFilter='{request.PositionFilter}', DepartmentFilter='{request.DepartmentFilter}'");
+
             // Парсим параметры сортировки
             var sortParams = ParseSortParameter(request.Sort);
+            Console.WriteLine($"Sort: Field='{sortParams.Field}', Order='{sortParams.Order}'");
 
             // Получаем данные с пагинацией, фильтрацией и сортировкой
             var (users, totalCount) = await _userRepository.GetUsersPagedAsync(
@@ -102,9 +107,11 @@ namespace Application.Services
                 pageSize: request.Limit,
                 sortBy: sortParams.Field,
                 sortOrder: sortParams.Order,
-                positionFilter: request.PositionFilter,    
+                positionFilter: request.PositionFilter,
                 departmentFilter: request.DepartmentFilter
             );
+
+            Console.WriteLine($"Repository result: {users.Count} users, totalCount={totalCount}");
 
             // Рассчитываем общее количество страниц
             var pageSize = request.Limit > 0 ? request.Limit : 10;
@@ -119,6 +126,9 @@ namespace Application.Services
                 TotalPages = totalPages,
                 PageSize = pageSize
             };
+
+            Console.WriteLine($"Final response: AmountOfUsers={response.AmountOfUsers}, UsersTable.Count={response.UsersTable.Count}");
+            Console.WriteLine($"=== GetUserTableAsync END ===");
 
             return response;
         }

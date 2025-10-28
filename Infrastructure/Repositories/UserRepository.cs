@@ -115,46 +115,66 @@ namespace Infrastructure.Repositories
         }
 
         public async Task<(List<User> Users, int TotalCount)> GetUsersPagedAsync(
-    int page,
-    int pageSize,
-    string sortBy = null,
-    string sortOrder = "asc",
-    string positionFilter = null,
-    string departmentFilter = null)
+    int page, int pageSize, string sortBy = null, string sortOrder = "asc",
+    string positionFilter = null, string departmentFilter = null)
         {
             var users = await GetUsersAsync();
+
+            Console.WriteLine($"=== DIAGNOSTICS START ===");
+            Console.WriteLine($"Total users from GetUsersAsync(): {users.Count}");
+            Console.WriteLine($"Users with WorkInfo: {users.Count(u => u.WorkInfo != null)}");
+            Console.WriteLine($"Users without WorkInfo: {users.Count(u => u.WorkInfo == null)}");
+
+            if (users.Any())
+            {
+                var sampleUser = users.First();
+                Console.WriteLine($"Sample user - WorkInfo: {sampleUser.WorkInfo != null}, " +
+                                 $"Position: {sampleUser.WorkInfo?.Position}, " +
+                                 $"Department: {sampleUser.WorkInfo?.Department}");
+            }
 
             // Фильтрация по отдельным полям
             var filteredUsers = users.AsQueryable();
 
-
+            Console.WriteLine($"Before filtering: {filteredUsers.Count()} users");
 
             if (!string.IsNullOrEmpty(positionFilter))
             {
+                Console.WriteLine($"Applying position filter: '{positionFilter}'");
                 filteredUsers = filteredUsers.Where(u =>
-                    u.WorkInfo.Position != null && u.WorkInfo.Position.Contains(positionFilter, StringComparison.OrdinalIgnoreCase));
+                    u.WorkInfo != null &&
+                    u.WorkInfo.Position != null &&
+                    u.WorkInfo.Position.Contains(positionFilter, StringComparison.OrdinalIgnoreCase));
+                Console.WriteLine($"After position filter: {filteredUsers.Count()} users");
             }
 
             if (!string.IsNullOrEmpty(departmentFilter))
             {
+                Console.WriteLine($"Applying department filter: '{departmentFilter}'");
                 filteredUsers = filteredUsers.Where(u =>
-                    u.WorkInfo.Department != null && u.WorkInfo.Department.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase));
+                    u.WorkInfo != null &&
+                    u.WorkInfo.Department != null &&
+                    u.WorkInfo.Department.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase));
+                Console.WriteLine($"After department filter: {filteredUsers.Count()} users");
             }
+
+            Console.WriteLine($"After all filters: {filteredUsers.Count()} users");
 
             // Сортировка
             if (!string.IsNullOrEmpty(sortBy))
             {
+                Console.WriteLine($"Applying sort: {sortBy} {sortOrder}");
                 filteredUsers = sortBy.ToLower() switch
                 {
                     "username" => sortOrder?.ToLower() == "desc"
                         ? filteredUsers.OrderByDescending(u => u.GetFullName())
                         : filteredUsers.OrderBy(u => u.GetFullName()),
                     "position" => sortOrder?.ToLower() == "desc"
-                        ? filteredUsers.OrderByDescending(u => u.WorkInfo.Position)
-                        : filteredUsers.OrderBy(u => u.WorkInfo.Position),
+                        ? filteredUsers.OrderByDescending(u => u.WorkInfo != null ? u.WorkInfo.Position ?? "" : "")
+                        : filteredUsers.OrderBy(u => u.WorkInfo != null ? u.WorkInfo.Position ?? "" : ""),
                     "department" => sortOrder?.ToLower() == "desc"
-                        ? filteredUsers.OrderByDescending(u => u.WorkInfo.Department)
-                        : filteredUsers.OrderBy(u => u.WorkInfo.Department),
+                        ? filteredUsers.OrderByDescending(u => u.WorkInfo != null ? u.WorkInfo.Department ?? "" : "")
+                        : filteredUsers.OrderBy(u => u.WorkInfo != null ? u.WorkInfo.Department ?? "" : ""),
                     _ => filteredUsers.OrderBy(u => u.GetFullName())
                 };
             }
@@ -164,12 +184,16 @@ namespace Infrastructure.Repositories
             }
 
             var totalCount = filteredUsers.Count();
+            Console.WriteLine($"Total count after sorting: {totalCount}");
 
             // Пагинация
             var pagedUsers = filteredUsers
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
+
+            Console.WriteLine($"After pagination (page {page}, size {pageSize}): {pagedUsers.Count} users");
+            Console.WriteLine($"=== DIAGNOSTICS END ===");
 
             return (pagedUsers, totalCount);
         }
