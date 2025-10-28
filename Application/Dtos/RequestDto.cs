@@ -16,4 +16,17 @@ namespace Application.Dtos
 
         public bool is_cached { get; set; } = false;
     }
+
+    public class TableRequestDto
+    {
+        public int page { get; set; } = 1;
+        public int Limit { get; set; } = 10;
+        public string Sort { get; set; }
+
+        // Раздельные фильтры
+        public string PositionFilter { get; set; }
+        public string DepartmentFilter { get; set; }
+
+        public bool isCached { get; set; } = false;
+    }
 }

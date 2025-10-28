@@ -19,9 +19,9 @@ namespace API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<ResponseUsersTreeDto>> GetUsers()
+        public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromBody] TableRequestDto request)
         {
-            var result = await _userService.GetUsersAsync();
+            var result = await _userService.GetUserTableAsync(request);
             return Ok(result);
         }
 

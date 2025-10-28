@@ -8,37 +8,24 @@ using System.Threading.Tasks;
 
 namespace Application.Dtos
 {
-    public class ResponseUsersTreeDto
+    public class ResponseTableUsersDto
     {
         public int AmountOfUsers { get; set; }
-
-        public List<UserTreeDto> UsersTree { get; set; } = new();
-
-        public bool IsCached = false;
+        public List<TableUserDto> UsersTable { get; set; } = new();
+        public bool IsCached { get; set; } = false;
+        public int CurrentPage { get; set; }
+        public int TotalPages { get; set; }
+        public int PageSize { get; set; }
     }
 
-    public class UserTreeDto
-    {
-        public Guid? ManagerId { get; set; }
-        public string ManagerName { get; set; }
-
-        public List<UserTreeItemDto> Subordinates { get; set; } = new();
-
-        public string UserName { get; set; }
-        public string? Position { get; set; }
-        public string? Department { get; set; }
-        public string? AvatarUrl { get; set; }
-        public Guid UserId { get; set; }
-    }
-
-    public class UserTreeItemDto
+    public class TableUserDto
     {
         public string UserName { get; set; }
         public string? Position { get; set; }
         public string? Department { get; set; }
-        public string? AvatarUrl { get; set; }
         public Guid UserId { get; set; }
     }
+
 
     public class UserDetailInfoDto
     {

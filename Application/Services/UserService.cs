@@ -91,16 +91,48 @@ namespace Application.Services
             return Mapper.MapUserToUserDetailInfoDto(user);
         }
 
-        public async Task<ResponseUsersTreeDto> GetUsersAsync(bool isCached = false)
+        public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
-            var users = await _userRepository.GetUsersAsync();
-            var response = new ResponseUsersTreeDto
+            // Парсим параметры сортировки
+            var sortParams = ParseSortParameter(request.Sort);
+
+            // Получаем данные с пагинацией, фильтрацией и сортировкой
+            var (users, totalCount) = await _userRepository.GetUsersPagedAsync(
+                page: request.page,
+                pageSize: request.Limit,
+                sortBy: sortParams.Field,
+                sortOrder: sortParams.Order,
+                positionFilter: request.PositionFilter,    
+                departmentFilter: request.DepartmentFilter
+            );
+
+            // Рассчитываем общее количество страниц
+            var pageSize = request.Limit > 0 ? request.Limit : 10;
+            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            var response = new ResponseTableUsersDto
             {
-                AmountOfUsers = users.Count(),
-                UsersTree = [.. users.Select(usr => Mapper.MapUserToUserTreeDto(usr))],
-                IsCached = isCached
+                AmountOfUsers = totalCount,
+                UsersTable = users.Select(usr => Mapper.MapToTableUserDto(usr)).ToList(),
+                IsCached = request.isCached,
+                CurrentPage = request.page,
+                TotalPages = totalPages,
+                PageSize = pageSize
             };
+
             return response;
+        }
+
+        private (string Field, string Order) ParseSortParameter(string sort)
+        {
+            if (string.IsNullOrEmpty(sort))
+                return (null, "asc");
+
+            var parts = sort.Split('_');
+            if (parts.Length != 2)
+                return (null, "asc");
+
+            return (parts[0], parts[1].ToLower());
         }
 
 

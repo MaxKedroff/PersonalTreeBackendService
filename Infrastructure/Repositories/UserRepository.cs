@@ -69,6 +69,9 @@ namespace Infrastructure.Repositories
                 .ToListAsync();
         }
 
+
+
+
         public async Task<User> GetUsersByIdAsync(Guid UserId)
         {
             return await _context.Users
@@ -109,6 +112,66 @@ namespace Infrastructure.Repositories
                 .Include(u => u.Subordinates)
                     .ThenInclude(sub => sub.ContactInfo)
                 .FirstOrDefaultAsync(u => u.Manager_id == null && u.IsActive);
+        }
+
+        public async Task<(List<User> Users, int TotalCount)> GetUsersPagedAsync(
+    int page,
+    int pageSize,
+    string sortBy = null,
+    string sortOrder = "asc",
+    string positionFilter = null,
+    string departmentFilter = null)
+        {
+            var users = await GetUsersAsync();
+
+            // Фильтрация по отдельным полям
+            var filteredUsers = users.AsQueryable();
+
+
+
+            if (!string.IsNullOrEmpty(positionFilter))
+            {
+                filteredUsers = filteredUsers.Where(u =>
+                    u.WorkInfo.Position != null && u.WorkInfo.Position.Contains(positionFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(departmentFilter))
+            {
+                filteredUsers = filteredUsers.Where(u =>
+                    u.WorkInfo.Department != null && u.WorkInfo.Department.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Сортировка
+            if (!string.IsNullOrEmpty(sortBy))
+            {
+                filteredUsers = sortBy.ToLower() switch
+                {
+                    "username" => sortOrder?.ToLower() == "desc"
+                        ? filteredUsers.OrderByDescending(u => u.GetFullName())
+                        : filteredUsers.OrderBy(u => u.GetFullName()),
+                    "position" => sortOrder?.ToLower() == "desc"
+                        ? filteredUsers.OrderByDescending(u => u.WorkInfo.Position)
+                        : filteredUsers.OrderBy(u => u.WorkInfo.Position),
+                    "department" => sortOrder?.ToLower() == "desc"
+                        ? filteredUsers.OrderByDescending(u => u.WorkInfo.Department)
+                        : filteredUsers.OrderBy(u => u.WorkInfo.Department),
+                    _ => filteredUsers.OrderBy(u => u.GetFullName())
+                };
+            }
+            else
+            {
+                filteredUsers = filteredUsers.OrderBy(u => u.GetFullName());
+            }
+
+            var totalCount = filteredUsers.Count();
+
+            // Пагинация
+            var pagedUsers = filteredUsers
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return (pagedUsers, totalCount);
         }
     }
 }

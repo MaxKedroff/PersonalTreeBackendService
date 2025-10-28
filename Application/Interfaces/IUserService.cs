@@ -10,7 +10,7 @@ namespace Application.Interfaces
     public interface IUserService
     {
 
-        Task<ResponseUsersTreeDto> GetUsersAsync(bool isCached = false);
+        Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request);
 
         Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId);
 
