@@ -30,7 +30,9 @@ namespace Application.Services
             _cacheOptions = new MemoryCacheEntryOptions()
                 .SetSlidingExpiration(TimeSpan.FromMinutes(5))
                 .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
-                .SetPriority(CacheItemPriority.Normal);
+                .SetPriority(CacheItemPriority.Normal)
+                .SetSize(1);
+                
         }
 
         public async Task<HierarchyResponseDto> GetDepartmentHierarchyAsync()

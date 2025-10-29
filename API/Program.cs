@@ -28,11 +28,7 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddCors();
 
-    builder.Services.AddMemoryCache(options =>
-    {
-        options.SizeLimit = 1024; // Лимит в MB
-        options.CompactionPercentage = 0.25; // Процент сжатия при достижении лимита
-    });
+    builder.Services.AddMemoryCache();
 
     builder.Services.AddSwaggerGen(c =>
     {
