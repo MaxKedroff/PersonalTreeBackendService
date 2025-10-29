@@ -3,6 +3,7 @@ using Application.Interfaces;
 using Application.Utils;
 using Domain.Entities;
 using Domain.Interfaces;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,43 +16,67 @@ namespace Application.Services
     {
 
         public IUserRepository _userRepository;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(IUserRepository userRepository)
+        public UserService(IUserRepository userRepository, ILogger<UserService> logger)
         {
             _userRepository = userRepository;
+            _logger = logger;
         }
 
         public async Task<HierarchyResponseDto> GetDepartmentHierarchyAsync()
         {
-            var ceo = await _userRepository.GetCeoAsync();
-            var allUsers = await _userRepository.GetUsersWithHierarchyAsync();
+            _logger.LogInformation("Starting to build department hierarchy");
 
-            var response = new HierarchyResponseDto();
-
-            if (ceo != null)
+            try
             {
-                response.Ceo = Mapper.MapEmployeeToHierarchyDto(ceo, allUsers);
-            }
+                var ceo = await _userRepository.GetCeoAsync();
+                var allUsers = await _userRepository.GetUsersWithHierarchyAsync();
 
-            var departments = allUsers
-                .Where(u => u.User_id != ceo?.User_id && !string.IsNullOrEmpty(u.WorkInfo?.Department))
-                .GroupBy(u => u.WorkInfo.Department)
-                .Select(g => new DepartmentHierarchyDto
+                _logger.LogInformation("Retrieved {UserCount} users for hierarchy, CEO found: {CeoFound}",
+                     allUsers.Count, ceo != null);
+
+                var response = new HierarchyResponseDto();
+
+                if (ceo != null)
                 {
-                    Department = g.Key,
-                    Employees = g.Where(u => u.Manager_id == ceo?.User_id ||
-                                   !allUsers.Any(m => m.User_id == u.Manager_id && m.WorkInfo?.Department == g.Key))
-                        .Select(emp => Mapper.MapEmployeeToHierarchyDto(emp, allUsers))
-                        .ToList()
-                }).ToList();
+                    response.Ceo = Mapper.MapEmployeeToHierarchyDto(ceo, allUsers);
+                    _logger.LogDebug("Mapped CEO: {CeoName}", ceo.GetFullName());
+                }
+                else
+                {
+                    _logger.LogWarning("CEO not found in the organization");
 
-            response.Departments = departments;
-            response.TotalEmployees = allUsers.Count;
+                }
 
-            return response;
+                var departments = allUsers
+                        .Where(u => u.User_id != ceo?.User_id && !string.IsNullOrEmpty(u.WorkInfo?.Department))
+                        .GroupBy(u => u.WorkInfo.Department)
+                        .Select(g => new DepartmentHierarchyDto
+                        {
+                            Department = g.Key,
+                            Employees = g.Where(u => u.Manager_id == ceo?.User_id ||
+                                           !allUsers.Any(m => m.User_id == u.Manager_id && m.WorkInfo?.Department == g.Key))
+                                .Select(emp => Mapper.MapEmployeeToHierarchyDto(emp, allUsers))
+                                .ToList()
+                        }).ToList();
 
+                response.Departments = departments;
+                response.TotalEmployees = allUsers.Count;
+                _logger.LogInformation("Hierarchy built successfully - {DepartmentCount} departments, {TotalEmployees} total employees",
+                   departments.Count, allUsers.Count);
+                return response;
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while building department hierarchy");
+
+                throw;
+            }
         }
 
+        [Obsolete]
         public async Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request)
         {
             if (request == null)
@@ -85,62 +110,115 @@ namespace Application.Services
             };
         }
 
+
         public async Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId)
         {
-            var user = await _userRepository.GetUsersByIdAsync(userId);
-            return Mapper.MapUserToUserDetailInfoDto(user);
+            _logger.LogInformation("Getting user details for ID: {UserId}", userId);
+            if (userId == Guid.Empty)
+            {
+                _logger.LogWarning("Invalid user ID provided");
+                throw new ArgumentException("Invalid user ID", nameof(userId));
+            }
+            try
+            {
+                var user = await _userRepository.GetUsersByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("User not found with ID: {UserId}", userId);
+                    throw new KeyNotFoundException($"User with ID {userId} not found");
+                }
+                _logger.LogInformation("User details retrieved successfully for ID: {UserId}, Name: {UserName}",
+                    userId, user.GetFullName());
+                return Mapper.MapUserToUserDetailInfoDto(user);
+            }catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while getting user details for ID: {UserId}", userId);
+                throw;
+            }
+            
         }
 
         public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
-            Console.WriteLine($"=== GetUserTableAsync START ===");
-            Console.WriteLine($"Request: page={request.page}, Limit={request.Limit}, " +
-                             $"PositionFilter='{request.PositionFilter}', DepartmentFilter='{request.DepartmentFilter}'");
-
-            // Парсим параметры сортировки
-            var sortParams = ParseSortParameter(request.Sort);
-            Console.WriteLine($"Sort: Field='{sortParams.Field}', Order='{sortParams.Order}'");
-
-            // Получаем данные с пагинацией, фильтрацией и сортировкой
-            var (users, totalCount) = await _userRepository.GetUsersPagedAsync(
+            _logger.LogInformation("Getting users table - Page: {Page}, Limit: {Limit}, " +
+                                "PositionFilter: '{PositionFilter}', DepartmentFilter: '{DepartmentFilter}', " +
+                                "Sort: '{Sort}', IsCached: {IsCached}",
+                                request.page, request.Limit, request.PositionFilter,
+                                request.DepartmentFilter, request.Sort, request.isCached);
+            try
+            {
+                if (request.page < 1)
+                {
+                    _logger.LogWarning("Invalid page number: {Page}", request.page);
+                    throw new ArgumentException("Page number must be greater than 0", nameof(request.page));
+                }
+                if (request.Limit < 1 || request.Limit > 100)
+                {
+                    _logger.LogWarning("Invalid limit: {Limit}", request.Limit);
+                    throw new ArgumentException("Limit must be between 1 and 100", nameof(request.Limit));
+                }
+                var sortParams = ParseSortParameter(request.Sort);
+                _logger.LogDebug("Parsed sort parameters - Field: '{Field}', Order: '{Order}'",
+                    sortParams.Field, sortParams.Order);
+                var (users, totalCount) = await _userRepository.GetUsersPagedAsync(
                 page: request.page,
                 pageSize: request.Limit,
                 sortBy: sortParams.Field,
                 sortOrder: sortParams.Order,
                 positionFilter: request.PositionFilter,
                 departmentFilter: request.DepartmentFilter
-            );
+                );
+                _logger.LogInformation("Repository returned {UserCount} users, total count: {TotalCount}",
+                   users.Count, totalCount);
 
-            Console.WriteLine($"Repository result: {users.Count} users, totalCount={totalCount}");
+                var pageSize = request.Limit > 0 ? request.Limit : 10;
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
-            // Рассчитываем общее количество страниц
-            var pageSize = request.Limit > 0 ? request.Limit : 10;
-            var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+                var response = new ResponseTableUsersDto
+                {
+                    AmountOfUsers = totalCount,
+                    UsersTable = users.Select(usr => Mapper.MapToTableUserDto(usr)).ToList(),
+                    IsCached = request.isCached,
+                    CurrentPage = request.page,
+                    TotalPages = totalPages,
+                    PageSize = pageSize
+                };
 
-            var response = new ResponseTableUsersDto
+                _logger.LogInformation("Table response prepared successfully - " +
+                                     "Users: {UserCount}, Total: {TotalCount}, Pages: {TotalPages}, " +
+                                     "CurrentPage: {CurrentPage}, PageSize: {PageSize}",
+                                     response.UsersTable.Count, response.AmountOfUsers, response.TotalPages,
+                                     response.CurrentPage, response.PageSize);
+
+                return response;
+            }
+            catch (Exception ex)
             {
-                AmountOfUsers = totalCount,
-                UsersTable = users.Select(usr => Mapper.MapToTableUserDto(usr)).ToList(),
-                IsCached = request.isCached,
-                CurrentPage = request.page,
-                TotalPages = totalPages,
-                PageSize = pageSize
-            };
-
-            Console.WriteLine($"Final response: AmountOfUsers={response.AmountOfUsers}, UsersTable.Count={response.UsersTable.Count}");
-            Console.WriteLine($"=== GetUserTableAsync END ===");
-
-            return response;
+                _logger.LogError(ex, "Error occurred while getting users table with parameters: " +
+                                   "Page: {Page}, Limit: {Limit}, PositionFilter: '{PositionFilter}', " +
+                                   "DepartmentFilter: '{DepartmentFilter}'",
+                                   request.page, request.Limit, request.PositionFilter, request.DepartmentFilter);
+                throw;
+            }
         }
 
         private (string Field, string Order) ParseSortParameter(string sort)
         {
             if (string.IsNullOrEmpty(sort))
+            {
+                _logger.LogDebug("No sort parameter provided, using default");
                 return (null, "asc");
+            }
 
             var parts = sort.Split('_');
             if (parts.Length != 2)
+            {
+                _logger.LogWarning("Invalid sort parameter format: '{Sort}', expected format: 'field_order'", sort);
                 return (null, "asc");
+            }
+
+            _logger.LogDebug("Sort parameter parsed successfully - Field: '{Field}', Order: '{Order}'",
+                parts[0], parts[1]);
 
             return (parts[0], parts[1].ToLower());
         }

@@ -17,6 +17,9 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Novell.Directory.Ldap" Version="2.2.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="System.DirectoryServices" Version="9.0.10" />
     <PackageReference Include="System.DirectoryServices.AccountManagement" Version="9.0.10" />
   </ItemGroup>
