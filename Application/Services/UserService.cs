@@ -3,6 +3,7 @@ using Application.Interfaces;
 using Application.Utils;
 using Domain.Entities;
 using Domain.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -17,19 +18,35 @@ namespace Application.Services
 
         public IUserRepository _userRepository;
         private readonly ILogger<UserService> _logger;
+        private readonly IMemoryCache _memoryCache;
+        private readonly MemoryCacheEntryOptions _cacheOptions;
 
-        public UserService(IUserRepository userRepository, ILogger<UserService> logger)
+        public UserService(IUserRepository userRepository, ILogger<UserService> logger, IMemoryCache memoryCache)
         {
             _userRepository = userRepository;
             _logger = logger;
+            _memoryCache = memoryCache;
+
+            _cacheOptions = new MemoryCacheEntryOptions()
+                .SetSlidingExpiration(TimeSpan.FromMinutes(5))
+                .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
+                .SetPriority(CacheItemPriority.Normal);
         }
 
         public async Task<HierarchyResponseDto> GetDepartmentHierarchyAsync()
         {
+            const string cacheKey = "department_hierarchy";
+
             _logger.LogInformation("Starting to build department hierarchy");
 
             try
             {
+                if (_memoryCache.TryGetValue(cacheKey, out HierarchyResponseDto cachedHierarchy))
+                {
+                    _logger.LogInformation("Department hierarchy found in cache");
+                    return cachedHierarchy;
+                }
+                _logger.LogInformation("Department hierarchy not found in cache, building from database");
                 var ceo = await _userRepository.GetCeoAsync();
                 var allUsers = await _userRepository.GetUsersWithHierarchyAsync();
 
@@ -63,7 +80,9 @@ namespace Application.Services
 
                 response.Departments = departments;
                 response.TotalEmployees = allUsers.Count;
-                _logger.LogInformation("Hierarchy built successfully - {DepartmentCount} departments, {TotalEmployees} total employees",
+
+                _memoryCache.Set(cacheKey, response, _cacheOptions);
+                _logger.LogInformation("Department hierarchy built and cached successfully - {DepartmentCount} departments, {TotalEmployees} total employees",
                    departments.Count, allUsers.Count);
                 return response;
 
@@ -140,6 +159,7 @@ namespace Application.Services
 
         public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
+            var cacheKey = $"user_table_{request.page}_{request.Limit}_{request.Sort}_{request.PositionFilter}_{request.DepartmentFilter}";
             _logger.LogInformation("Getting users table - Page: {Page}, Limit: {Limit}, " +
                                 "PositionFilter: '{PositionFilter}', DepartmentFilter: '{DepartmentFilter}', " +
                                 "Sort: '{Sort}', IsCached: {IsCached}",
@@ -147,6 +167,20 @@ namespace Application.Services
                                 request.DepartmentFilter, request.Sort, request.isCached);
             try
             {
+                if (!request.isCached)
+                {
+                    _logger.LogInformation("Hard cache reset requested for user table, removing cache key: {CacheKey}", cacheKey);
+                    _memoryCache.Remove(cacheKey);
+                }
+                else
+                {
+                    if (_memoryCache.TryGetValue(cacheKey, out ResponseTableUsersDto cachedResponse))
+                    {
+                        _logger.LogInformation("User table found in cache for key: {CacheKey}", cacheKey);
+                        return cachedResponse;
+                    }
+                    _logger.LogInformation("User table not found in cache for key: {CacheKey}, querying database", cacheKey);
+                }
                 if (request.page < 1)
                 {
                     _logger.LogWarning("Invalid page number: {Page}", request.page);
@@ -178,11 +212,18 @@ namespace Application.Services
                 {
                     AmountOfUsers = totalCount,
                     UsersTable = users.Select(usr => Mapper.MapToTableUserDto(usr)).ToList(),
-                    IsCached = request.isCached,
+                    IsCached = false,
                     CurrentPage = request.page,
                     TotalPages = totalPages,
                     PageSize = pageSize
                 };
+
+                if (request.isCached != false)
+                {
+                    _memoryCache.Set(cacheKey, response, _cacheOptions);
+                    _logger.LogInformation("User table cached successfully for key: {CacheKey}", cacheKey);
+                    response.IsCached = true; 
+                }
 
                 _logger.LogInformation("Table response prepared successfully - " +
                                      "Users: {UserCount}, Total: {TotalCount}, Pages: {TotalPages}, " +
