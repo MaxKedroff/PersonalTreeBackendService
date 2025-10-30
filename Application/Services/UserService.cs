@@ -43,11 +43,11 @@ namespace Application.Services
 
             try
             {
-                if (_memoryCache.TryGetValue(cacheKey, out HierarchyResponseDto cachedHierarchy))
-                {
-                    _logger.LogInformation("Department hierarchy found in cache");
-                    return cachedHierarchy;
-                }
+                //if (_memoryCache.TryGetValue(cacheKey, out HierarchyResponseDto cachedHierarchy))
+                //{
+                //    _logger.LogInformation("Department hierarchy found in cache");
+                //    return cachedHierarchy;
+                //}
                 _logger.LogInformation("Department hierarchy not found in cache, building from database");
                 var ceo = await _userRepository.GetCeoAsync();
                 var allUsers = await _userRepository.GetUsersWithHierarchyAsync();
