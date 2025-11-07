@@ -7,6 +7,8 @@ COPY ["Application/*.csproj", "Application/"]
 COPY ["Domain/*.csproj", "Domain/"]
 COPY ["Infrastructure/*.csproj", "Infrastructure/"]
 
+RUN sed -i '/Application.UnitTests/d' *.sln
+
 RUN dotnet restore
 
 COPY . .
