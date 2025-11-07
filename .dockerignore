@@ -1,3 +1,4 @@
+**/Application.UnitTests/
 **/bin/
 **/obj/
 **/.dockerignore

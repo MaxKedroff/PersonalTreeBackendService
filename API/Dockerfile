@@ -6,7 +6,6 @@ COPY ["API/*.csproj", "API/"]
 COPY ["Application/*.csproj", "Application/"]
 COPY ["Domain/*.csproj", "Domain/"]
 COPY ["Infrastructure/*.csproj", "Infrastructure/"]
-COPY ["Application.UnitTests/*.csproj", "Application.UnitTests/"]
 
 RUN dotnet restore
 
