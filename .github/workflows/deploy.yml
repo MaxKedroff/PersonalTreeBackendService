@@ -12,8 +12,30 @@ env:
   REMOTE_USER: ${{ secrets.REMOTE_USER }}
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Run unit tests
+      run: dotnet test --no-build --verbosity normal --configuration Release
+
   build-and-deploy:
     runs-on: ubuntu-latest
+    needs: test
 
     steps:
     - name: Checkout code
