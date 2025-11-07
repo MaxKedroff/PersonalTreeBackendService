@@ -11,7 +11,10 @@ RUN sed -i '/Application.UnitTests/d' *.sln
 
 RUN dotnet restore
 
-COPY . .
+COPY ["API/", "API/"]
+COPY ["Application/", "Application/"]
+COPY ["Domain/", "Domain/"]
+COPY ["Infrastructure/", "Infrastructure/"]
 
 RUN dotnet build -c Release --no-restore
 
