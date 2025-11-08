@@ -1,5 +1,7 @@
 ﻿using Application.Dtos;
 using Application.Interfaces;
+using Core.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
@@ -8,6 +10,7 @@ namespace API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(AuthOptions.POLICY_USER)]
     public class UsersController : ControllerBase
     {
 
@@ -22,6 +25,7 @@ namespace API.Controllers
         }
 
         [HttpGet]
+        [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromQuery] int page = 1,
             [FromQuery] int limit = 10,
             [FromQuery] string? sort = null,
@@ -69,6 +73,7 @@ namespace API.Controllers
         }
 
         [HttpGet("{userId}")]
+        [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<UserDetailInfoDto>> GetUserById(Guid userId)
         {
             try
@@ -105,6 +110,7 @@ namespace API.Controllers
         }
 
         [HttpPost("search")]
+        [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<SearchResponseDto>> SearchItems([FromBody] SearchRequestDto request)
         {
             try
@@ -148,6 +154,7 @@ namespace API.Controllers
         }
 
         [HttpGet("hierarchy")]
+        [Authorize(AuthOptions.POLICY_USER)]
         [ProducesResponseType(typeof(HierarchyResponseDto), 200)]
         [ProducesResponseType(404)]
         [ProducesResponseType(500)]

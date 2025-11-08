@@ -29,4 +29,19 @@ namespace Application.Dtos
 
         public bool isCached { get; set; } = false;
     }
+
+    public class CreateUserDTO
+    {
+        public string Username { get; set; }
+
+        public string Password { get; set; }
+
+        public string Login { get; set; }
+    }
+
+    public class LoginDTO
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
 }

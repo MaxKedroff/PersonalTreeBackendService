@@ -197,5 +197,19 @@ namespace Infrastructure.Repositories
 
             return (pagedUsers, totalCount);
         }
+
+        public async Task<User> GetUserByLoginAsync(string login)
+        {
+            if (string.IsNullOrWhiteSpace(login))
+            {
+                throw new ArgumentException("Login cannot be empty", nameof(login));
+            }
+
+            return await _context.Users
+                .Include(u => u.PersonalInfo)
+                .Include(u => u.WorkInfo)
+                .Include(u => u.ContactInfo)
+                .FirstOrDefaultAsync(u => u.Login.ToLower() == login.ToLower() && u.IsActive);
+        }
     }
 }

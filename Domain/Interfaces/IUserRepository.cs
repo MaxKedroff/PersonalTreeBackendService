@@ -26,5 +26,8 @@ namespace Domain.Interfaces
         Task<List<User>> GetUsersWithHierarchyAsync();
 
         Task<User> GetCeoAsync();
+
+        Task<User> GetUserByLoginAsync(string login);
+
     }
 }

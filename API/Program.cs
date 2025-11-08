@@ -1,11 +1,15 @@
 ﻿using Prometheus;
 using Application;
 using System;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 using Application.Utils;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Events;
+using Microsoft.IdentityModel.Tokens;
+using Core.Utils;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -25,6 +29,37 @@ try
     builder.Host.UseSerilog();
 
     builder.Services.AddControllers();
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+
+            ValidIssuer = AuthOptions.ISSUER,
+
+            ValidateAudience = true,
+
+            ValidAudience = AuthOptions.AUDIENCE,
+
+            ValidateLifetime = true,
+
+            IssuerSigningKey = AuthOptions.GetSymmetricSecurityKey(),
+
+            ValidateIssuerSigningKey = true,
+        };
+    });
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy(AuthOptions.POLICY_USER, policy =>
+            policy.RequireRole(AuthOptions.ROLE_USER, AuthOptions.ROLE_HR, AuthOptions.ROLE_ADMIN));
+
+        options.AddPolicy(AuthOptions.POLICY_HR, policy =>
+            policy.RequireRole(AuthOptions.ROLE_HR, AuthOptions.ROLE_ADMIN));
+
+        options.AddPolicy(AuthOptions.POLICY_ADMIN, policy =>
+            policy.RequireRole(AuthOptions.ROLE_ADMIN));
+    });
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddCors();
 
@@ -93,7 +128,8 @@ try
         .AllowAnyOrigin()
         .AllowAnyMethod()
         .AllowAnyHeader());
-
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.MapControllers();
     app.MapMetrics("/metrics");
 

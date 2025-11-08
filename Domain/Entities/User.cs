@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Core.Utils;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 
@@ -22,14 +23,14 @@ namespace Domain.Entities
         [Required]
         public string Password { get; set; }
         public Guid? Manager_id { get; set; }
-        public bool Is_admin { get; set; }
+        public string Role { get; set; } = AuthOptions.ROLE_USER; 
         public PersonalInfo PersonalInfo { get; set; } = new PersonalInfo();
         public WorkInfo WorkInfo { get; set; } = new WorkInfo();
         public ContactInfo ContactInfo { get; set; } = new ContactInfo();
         [Column(TypeName = "jsonb")]
         public JObject Contacts { get; set; } = new JObject();
 
-        public string SamAccountName { get; set; } // Уникальный идентификатор из AD
+        public string SamAccountName { get; set; } 
         public string Email { get; set; }
         public bool IsActive { get; set; } = true;
         public DateTime LastAdSync { get; set; }
@@ -40,6 +41,11 @@ namespace Domain.Entities
 
         public User Manager { get; set; }
         public ICollection<User> Subordinates { get; set; } = new List<User>();
+
+        public bool IsInRole(string role) => Role == role;
+        public bool IsAdmin() => Role == AuthOptions.ROLE_ADMIN;
+        public bool IsHr() => Role == AuthOptions.ROLE_HR || IsAdmin();
+        public bool IsUser() => true;
 
         public void SetContact<T>(string key, T value)
         {
