@@ -6,6 +6,8 @@ COPY ["API/*.csproj", "API/"]
 COPY ["Application/*.csproj", "Application/"]
 COPY ["Domain/*.csproj", "Domain/"]
 COPY ["Infrastructure/*.csproj", "Infrastructure/"]
+COPY ["Core/*.csproj", "Core/"]
+
 
 RUN sed -i '/Application.UnitTests/d' *.sln
 
@@ -15,6 +17,7 @@ COPY ["API/", "API/"]
 COPY ["Application/", "Application/"]
 COPY ["Domain/", "Domain/"]
 COPY ["Infrastructure/", "Infrastructure/"]
+COPY ["Core/", "Core/"]
 
 RUN dotnet build -c Release --no-restore
 
