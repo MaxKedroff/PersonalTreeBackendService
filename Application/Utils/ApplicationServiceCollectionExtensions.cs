@@ -30,6 +30,7 @@ namespace Application.Utils
             // Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ILdapService, LdapService>();
+            services.AddScoped<IAuthService, AuthService>();
             return services;
         }
     }
