@@ -20,14 +20,11 @@ namespace Domain.Interfaces
         string departmentFilter = null);
 
         Task<User> GetUsersByIdAsync(Guid UserId);
-
         Task<List<User>> GetSearchResultAsync(string criteria, string searchString, int queryAmount);
-
         Task<List<User>> GetUsersWithHierarchyAsync();
-
         Task<User> GetCeoAsync();
-
         Task<User> GetUserByLoginAsync(string login);
+        Task UpdateUserAsync(User user);
 
     }
 }

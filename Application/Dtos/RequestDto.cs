@@ -44,4 +44,13 @@ namespace Application.Dtos
         public string Username { get; set; }
         public string Password { get; set; }
     }
+
+    public class UpdateProfileDto
+    {
+        public string? Phone { get; set; }
+        public string? City { get; set; }
+        public string? Interests { get; set; }
+        public string? Avatar { get; set; } 
+        public Dictionary<string, object>? Contacts { get; set; }
+    }
 }

@@ -17,5 +17,7 @@ namespace Application.Interfaces
         Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request);
 
         Task<HierarchyResponseDto> GetDepartmentHierarchyAsync();
+
+        Task<UserDetailInfoDto> UpdateUserProfileAsync(Guid userId, Guid currentUserId, string currentUserRole, UpdateProfileDto updateDto);
     }
 }

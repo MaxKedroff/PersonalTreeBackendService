@@ -51,10 +51,8 @@ namespace Application.UnitTests.Services
             _mockUserRepository.Setup(x => x.GetUsersPagedAsync(1, 10, "username", "asc", null, null))
                 .ReturnsAsync((users, 1));
 
-            // Act
             var result = await _userService.GetUserTableAsync(request);
 
-            // Assert
             Assert.NotNull(result);
             Assert.Equal(1, result.AmountOfUsers);
             Assert.Single(result.UsersTable);
@@ -143,8 +141,7 @@ namespace Application.UnitTests.Services
         [Fact]
         public async Task GetDepartmentHierarchyAsync_ValidData_ReturnsHierarchy()
         {
-            // Arrange
-            var ceo = CreateTestUser(Guid.NewGuid(), "User", "CEO", "CEO", "Management"); // Поменял порядок: Last_name, First_name
+            var ceo = CreateTestUser(Guid.NewGuid(), "User", "CEO", "CEO", "Management"); 
             var employees = new List<User>
     {
         ceo,
@@ -157,10 +154,8 @@ namespace Application.UnitTests.Services
             object cachedValue = null;
             _mockMemoryCache.Setup(x => x.TryGetValue(It.IsAny<object>(), out cachedValue)).Returns(false);
 
-            // Act
             var result = await _userService.GetDepartmentHierarchyAsync();
 
-            // Assert
             Assert.NotNull(result);
             Assert.NotNull(result.Ceo);
             Assert.Equal("User CEO", result.Ceo.UserName);
@@ -199,6 +194,251 @@ namespace Application.UnitTests.Services
             Assert.Equal(expectedField, result.Field);
             Assert.Equal(expectedOrder, result.Order);
         }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_UserUpdatesOwnProfile_ReturnsUpdatedUser()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto
+            {
+                Phone = "+7-999-123-45-67",
+                City = "Москва",
+                Interests = "программирование, фотография",
+                Avatar = "data:image/png;base64,test",
+                Contacts = new Dictionary<string, object>
+                {
+                    { "telegram", "@testuser" },
+                    { "github", "testuser" }
+                }
+            };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Phone, existingUser.ContactInfo.Phone);
+            Assert.Equal(updateDto.City, existingUser.ContactInfo.City);
+            Assert.Equal(updateDto.Interests, existingUser.PersonalInfo.Interests);
+            Assert.Equal(updateDto.Avatar, existingUser.ContactInfo.Avatar);
+
+            _mockUserRepository.Verify(x => x.UpdateUserAsync(existingUser), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_AdminUpdatesOtherUser_ReturnsUpdatedUser()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = Guid.NewGuid();
+            var currentUserRole = "Admin";
+            var updateDto = new UpdateProfileDto
+            {
+                Phone = "+7-495-111-11-11",
+                City = "Санкт-Петербург",
+                Interests = "управление, стратегия"
+            };
+
+            var existingUser = CreateTestUser(userId, "Петров", "Петр", "Manager", "Management");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Phone, existingUser.ContactInfo.Phone);
+            Assert.Equal(updateDto.City, existingUser.ContactInfo.City);
+            Assert.Equal(updateDto.Interests, existingUser.PersonalInfo.Interests);
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_HrUpdatesOtherUser_ReturnsUpdatedUser()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = Guid.NewGuid();
+            var currentUserRole = "Hr";
+            var updateDto = new UpdateProfileDto
+            {
+                Phone = "+7-495-222-22-22",
+                City = "Казань",
+                Interests = "рекрутинг, психология"
+            };
+
+            var existingUser = CreateTestUser(userId, "Сидорова", "Анна", "HR Specialist", "HR");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Phone, existingUser.ContactInfo.Phone);
+            Assert.Equal(updateDto.City, existingUser.ContactInfo.City);
+            Assert.Equal(updateDto.Interests, existingUser.PersonalInfo.Interests);
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_UserTriesToUpdateOtherUser_ThrowsUnauthorizedAccessException()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = Guid.NewGuid(); 
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto { Phone = "+7-999-999-99-99" };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto));
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_UserNotFound_ThrowsKeyNotFoundException()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto { Phone = "+7-999-999-99-99" };
+
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync((User)null);
+
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto));
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_InvalidAvatarFormat_ThrowsArgumentException()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto
+            {
+                Avatar = "invalid_avatar_format"
+            };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto));
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_ValidHttpAvatar_UpdatesSuccessfully()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto
+            {
+                Avatar = "https://example.com/avatar.jpg"
+            };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Avatar, existingUser.ContactInfo.Avatar);
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_ValidBase64Avatar_UpdatesSuccessfully()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto
+            {
+                Avatar = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/"
+            };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Avatar, existingUser.ContactInfo.Avatar);
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_PartialUpdate_UpdatesOnlyProvidedFields()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var originalPhone = "+7-495-000-00-00";
+            var originalCity = "Москва";
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            existingUser.ContactInfo.Phone = originalPhone;
+            existingUser.ContactInfo.City = originalCity;
+
+            var updateDto = new UpdateProfileDto
+            {
+                Phone = "+7-999-123-45-67"
+            };
+
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Phone, existingUser.ContactInfo.Phone); 
+            Assert.Equal(originalCity, existingUser.ContactInfo.City); 
+            Assert.Equal(originalPhone, "+7-495-000-00-00"); 
+        }
+
+        [Fact]
+        public async Task UpdateUserProfileAsync_EmptyContacts_UpdatesSuccessfully()
+        {
+            var userId = Guid.NewGuid();
+            var currentUserId = userId;
+            var currentUserRole = "User";
+            var updateDto = new UpdateProfileDto
+            {
+                Phone = "+7-999-123-45-67",
+                Contacts = new Dictionary<string, object>() 
+            };
+
+            var existingUser = CreateTestUser(userId, "Иванов", "Иван", "Developer", "IT");
+            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(userId))
+                .ReturnsAsync(existingUser);
+            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+            Assert.NotNull(result);
+            Assert.Equal(updateDto.Phone, existingUser.ContactInfo.Phone);
+        }
+
+
 
         private User CreateTestUser(Guid id, string lastName, string firstName, string position, string department, Guid? managerId = null)
         {

@@ -211,5 +211,23 @@ namespace Infrastructure.Repositories
                 .Include(u => u.ContactInfo)
                 .FirstOrDefaultAsync(u => u.Login.ToLower() == login.ToLower() && u.IsActive);
         }
+
+        public async Task UpdateUserAsync(User user)
+        {
+            try
+            {
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
     }
 }

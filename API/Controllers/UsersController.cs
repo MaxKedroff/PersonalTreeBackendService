@@ -4,6 +4,7 @@ using Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace API.Controllers
@@ -182,6 +183,70 @@ namespace API.Controllers
                 _logger.LogError(ex, "Error occurred while retrieving organizational hierarchy");
                 return StatusCode(500, new { message = "An error occurred while retrieving organizational hierarchy" });
             }
+        }
+
+        [HttpPut("{userId}")]
+        [Authorize(AuthOptions.POLICY_USER)]
+        public async Task<ActionResult<UserDetailInfoDto>> UpdateProfile(Guid userId, [FromBody] UpdateProfileDto updateDto)
+        {
+            try
+            {
+                if (updateDto == null)
+                {
+                    return BadRequest(new { message = "Update data is required" });
+                }
+
+                var currentUserId = GetCurrentUserId();
+                var currentUserRole = GetCurrentUserRole();
+
+                _logger.LogInformation("Update profile request - Target: {UserId}, Current User: {CurrentUserId}, Role: {Role}",
+                    userId, currentUserId, currentUserRole);
+
+                var updatedUser = await _userService.UpdateUserProfileAsync(userId, currentUserId, currentUserRole, updateDto);
+
+                return Ok(updatedUser);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Unauthorized profile update attempt - User: {UserId}, Current User: {CurrentUserId}",
+                    userId, GetCurrentUserId());
+                return Forbid(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning("User not found for update: {UserId}", userId);
+                return NotFound(new { message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning("Invalid argument in profile update: {Message}", ex.Message);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating profile for user: {UserId}", userId);
+                return StatusCode(500, new { message = "An error occurred while updating profile" });
+            }
+        }
+
+        private Guid GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                throw new UnauthorizedAccessException("Invalid user ID in token");
+            }
+            return userId;
+        }
+
+        private string GetCurrentUserRole()
+        {
+            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+            if (string.IsNullOrEmpty(roleClaim))
+            {
+                throw new UnauthorizedAccessException("Role claim not found in token");
+            }
+            return roleClaim;
         }
     }
 }

@@ -266,6 +266,90 @@ namespace Application.Services
             return (parts[0], parts[1].ToLower());
         }
 
+        public async Task<UserDetailInfoDto> UpdateUserProfileAsync(Guid userId, Guid currentUserId, string currentUserRole, UpdateProfileDto updateDto)
+        {
+            _logger.LogInformation("Updating user profile - Target User: {UserId}, Current User: {CurrentUserId}, Role: {Role}",
+                userId, currentUserId, currentUserRole);
+
+            try
+            {
+                if (userId != currentUserId && currentUserRole != "Admin" && currentUserRole != "Hr")
+                {
+                    _logger.LogWarning("User {CurrentUserId} with role {Role} attempted to update profile of user {UserId} without permission",
+                        currentUserId, currentUserRole, userId);
+                    throw new UnauthorizedAccessException("You don't have permission to update this user's profile");
+                }
+
+                var user = await _userRepository.GetUsersByIdAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("User not found for update: {UserId}", userId);
+                    throw new KeyNotFoundException($"User with ID {userId} not found");
+                }
+
+                if (!string.IsNullOrWhiteSpace(updateDto.Phone))
+                {
+                    user.ContactInfo.Phone = updateDto.Phone;
+                    _logger.LogDebug("Updated phone for user {UserId}", userId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(updateDto.City))
+                {
+                    user.ContactInfo.City = updateDto.City;
+                    _logger.LogDebug("Updated city for user {UserId}", userId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(updateDto.Interests))
+                {
+                    user.PersonalInfo.Interests = updateDto.Interests;
+                    _logger.LogDebug("Updated interests for user {UserId}", userId);
+                }
+
+                if (!string.IsNullOrWhiteSpace(updateDto.Avatar))
+                {
+                    if (updateDto.Avatar.StartsWith("data:image/") ||
+                        updateDto.Avatar.StartsWith("http://") ||
+                        updateDto.Avatar.StartsWith("https://"))
+                    {
+                        user.ContactInfo.Avatar = updateDto.Avatar;
+                        _logger.LogDebug("Updated avatar for user {UserId}", userId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Invalid avatar format for user {UserId}", userId);
+                        throw new ArgumentException("Invalid avatar format. Expected Base64 data URL or HTTP URL");
+                    }
+                }
+
+                if (updateDto.Contacts != null && updateDto.Contacts.Any())
+                {
+                    foreach (var contact in updateDto.Contacts)
+                    {
+                        if (!string.IsNullOrWhiteSpace(contact.Key))
+                        {
+                            user.SetContact(contact.Key, contact.Value);
+                            _logger.LogDebug("Updated contact {ContactKey} for user {UserId}", contact.Key, userId);
+                        }
+                    }
+                }
+
+                user.Updated_at = DateTime.UtcNow;
+
+                await _userRepository.UpdateUserAsync(user);
+
+                _logger.LogInformation("User profile updated successfully - User: {UserId}, Updated by: {CurrentUserId}",
+                    userId, currentUserId);
+
+
+                return Mapper.MapUserToUserDetailInfoDto(user);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating user profile for ID: {UserId}", userId);
+                throw;
+            }
+        }
+
 
     }
 }
