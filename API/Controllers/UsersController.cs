@@ -112,6 +112,7 @@ namespace API.Controllers
 
         [HttpPost("search")]
         [Authorize(AuthOptions.POLICY_USER)]
+        [Obsolete("Use GetUserTableAsync with search functionality instead")]
         public async Task<ActionResult<SearchResponseDto>> SearchItems([FromBody] SearchRequestDto request)
         {
             try

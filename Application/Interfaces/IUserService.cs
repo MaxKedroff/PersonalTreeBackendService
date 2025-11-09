@@ -14,6 +14,7 @@ namespace Application.Interfaces
 
         Task<UserDetailInfoDto> GetUserDetailAsync(Guid userId);
 
+        [Obsolete("Use GetUserTableAsync with search functionality instead")]
         Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request);
 
         Task<HierarchyResponseDto> GetDepartmentHierarchyAsync();

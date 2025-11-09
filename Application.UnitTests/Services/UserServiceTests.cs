@@ -48,7 +48,7 @@ namespace Application.UnitTests.Services
                 CreateTestUser(Guid.NewGuid(), "John", "Doe", "Developer", "IT")
             };
 
-            _mockUserRepository.Setup(x => x.GetUsersPagedAsync(1, 10, "username", "asc", null, null))
+            _mockUserRepository.Setup(x => x.GetUsersPagedAsync(1, 10, "username", "asc", null, null, null))
                 .ReturnsAsync((users, 1));
 
             var result = await _userService.GetUserTableAsync(request);

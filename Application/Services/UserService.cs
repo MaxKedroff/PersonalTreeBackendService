@@ -97,7 +97,7 @@ namespace Application.Services
             }
         }
 
-        [Obsolete]
+        [Obsolete("Use GetUserTableAsync with search functionality instead")]
         public async Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request)
         {
             if (request == null)
@@ -161,12 +161,13 @@ namespace Application.Services
 
         public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
-            var cacheKey = $"user_table_{request.page}_{request.Limit}_{request.Sort}_{request.PositionFilter}_{request.DepartmentFilter}";
+            var cacheKey = $"user_table_{request.page}_{request.Limit}_{request.Sort}_{request.PositionFilter}_{request.DepartmentFilter}_{request.SearchText}";
+
             _logger.LogInformation("Getting users table - Page: {Page}, Limit: {Limit}, " +
                                 "PositionFilter: '{PositionFilter}', DepartmentFilter: '{DepartmentFilter}', " +
-                                "Sort: '{Sort}', IsCached: {IsCached}",
+                                "SearchText: '{SearchText}', Sort: '{Sort}', IsCached: {IsCached}",
                                 request.page, request.Limit, request.PositionFilter,
-                                request.DepartmentFilter, request.Sort, request.isCached);
+                                request.DepartmentFilter, request.SearchText, request.Sort, request.isCached);
             try
             {
                 if (!request.isCached)
@@ -183,6 +184,7 @@ namespace Application.Services
                     }
                     _logger.LogInformation("User table not found in cache for key: {CacheKey}, querying database", cacheKey);
                 }
+
                 if (request.page < 1)
                 {
                     _logger.LogWarning("Invalid page number: {Page}", request.page);
@@ -193,17 +195,21 @@ namespace Application.Services
                     _logger.LogWarning("Invalid limit: {Limit}", request.Limit);
                     throw new ArgumentException("Limit must be between 1 and 100", nameof(request.Limit));
                 }
+
                 var sortParams = ParseSortParameter(request.Sort);
                 _logger.LogDebug("Parsed sort parameters - Field: '{Field}', Order: '{Order}'",
                     sortParams.Field, sortParams.Order);
+
                 var (users, totalCount) = await _userRepository.GetUsersPagedAsync(
-                page: request.page,
-                pageSize: request.Limit,
-                sortBy: sortParams.Field,
-                sortOrder: sortParams.Order,
-                positionFilter: request.PositionFilter,
-                departmentFilter: request.DepartmentFilter
+                    page: request.page,
+                    pageSize: request.Limit,
+                    sortBy: sortParams.Field,
+                    sortOrder: sortParams.Order,
+                    positionFilter: request.PositionFilter,
+                    departmentFilter: request.DepartmentFilter,
+                    searchText: request.SearchText
                 );
+
                 _logger.LogInformation("Repository returned {UserCount} users, total count: {TotalCount}",
                    users.Count, totalCount);
 
@@ -224,7 +230,7 @@ namespace Application.Services
                 {
                     _memoryCache.Set(cacheKey, response, _cacheOptions);
                     _logger.LogInformation("User table cached successfully for key: {CacheKey}", cacheKey);
-                    response.IsCached = true; 
+                    response.IsCached = true;
                 }
 
                 _logger.LogInformation("Table response prepared successfully - " +
@@ -239,8 +245,9 @@ namespace Application.Services
             {
                 _logger.LogError(ex, "Error occurred while getting users table with parameters: " +
                                    "Page: {Page}, Limit: {Limit}, PositionFilter: '{PositionFilter}', " +
-                                   "DepartmentFilter: '{DepartmentFilter}'",
-                                   request.page, request.Limit, request.PositionFilter, request.DepartmentFilter);
+                                   "DepartmentFilter: '{DepartmentFilter}', SearchText: '{SearchText}'",
+                                   request.page, request.Limit, request.PositionFilter,
+                                   request.DepartmentFilter, request.SearchText);
                 throw;
             }
         }

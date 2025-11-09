@@ -115,8 +115,8 @@ namespace Infrastructure.Repositories
         }
 
         public async Task<(List<User> Users, int TotalCount)> GetUsersPagedAsync(
-    int page, int pageSize, string sortBy = null, string sortOrder = "asc",
-    string positionFilter = null, string departmentFilter = null)
+            int page, int pageSize, string sortBy = null, string sortOrder = "asc",
+            string positionFilter = null, string departmentFilter = null, string searchText = null)
         {
             var users = await GetUsersAsync();
 
@@ -124,6 +124,7 @@ namespace Infrastructure.Repositories
             Console.WriteLine($"Total users from GetUsersAsync(): {users.Count}");
             Console.WriteLine($"Users with WorkInfo: {users.Count(u => u.WorkInfo != null)}");
             Console.WriteLine($"Users without WorkInfo: {users.Count(u => u.WorkInfo == null)}");
+            Console.WriteLine($"Search text: '{searchText}'");
 
             if (users.Any())
             {
@@ -137,6 +138,27 @@ namespace Infrastructure.Repositories
             var filteredUsers = users.AsQueryable();
 
             Console.WriteLine($"Before filtering: {filteredUsers.Count()} users");
+
+            // Текстовый поиск по всем полям
+            if (!string.IsNullOrEmpty(searchText))
+            {
+                Console.WriteLine($"Applying search text: '{searchText}'");
+                filteredUsers = filteredUsers.Where(u =>
+                    (u.WorkInfo != null && u.WorkInfo.Position != null &&
+                     u.WorkInfo.Position.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                    (u.WorkInfo != null && u.WorkInfo.Department != null &&
+                     u.WorkInfo.Department.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                    (u.PersonalInfo != null && (
+                        (!string.IsNullOrEmpty(u.PersonalInfo.Last_name) &&
+                         u.PersonalInfo.Last_name.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(u.PersonalInfo.First_name) &&
+                         u.PersonalInfo.First_name.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(u.PersonalInfo.Patronymic) &&
+                         u.PersonalInfo.Patronymic.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    ))
+                );
+                Console.WriteLine($"After search text filter: {filteredUsers.Count()} users");
+            }
 
             if (!string.IsNullOrEmpty(positionFilter))
             {

@@ -27,6 +27,9 @@ namespace Application.Dtos
         public string? PositionFilter { get; set; }
         public string? DepartmentFilter { get; set; }
 
+        public string? SearchText { get; set; }
+
+
         public bool isCached { get; set; } = false;
     }
 

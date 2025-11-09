@@ -12,12 +12,8 @@ namespace Domain.Interfaces
         Task<List<User>> GetUsersAsync();
 
         Task<(List<User> Users, int TotalCount)> GetUsersPagedAsync(
-        int page,
-        int pageSize,
-        string sortBy = null,
-        string sortOrder = "asc",
-        string positionFilter = null,
-        string departmentFilter = null);
+        int page, int pageSize, string sortBy = null, string sortOrder = "asc",
+        string positionFilter = null, string departmentFilter = null, string searchText = null);
 
         Task<User> GetUsersByIdAsync(Guid UserId);
         Task<List<User>> GetSearchResultAsync(string criteria, string searchString, int queryAmount);
