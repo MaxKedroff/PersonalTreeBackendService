@@ -154,7 +154,9 @@ namespace Infrastructure.Repositories
                         (!string.IsNullOrEmpty(u.PersonalInfo.First_name) &&
                          u.PersonalInfo.First_name.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
                         (!string.IsNullOrEmpty(u.PersonalInfo.Patronymic) &&
-                         u.PersonalInfo.Patronymic.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                         u.PersonalInfo.Patronymic.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
+                         (!string.IsNullOrEmpty(u.GetFullName()) &&
+             u.GetFullName().Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     ))
                 );
                 Console.WriteLine($"After search text filter: {filteredUsers.Count()} users");
