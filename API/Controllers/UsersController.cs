@@ -59,7 +59,8 @@ namespace API.Controllers
                     Sort = sort,
                     PositionFilter = positionFilter,
                     DepartmentFilter = departmentFilter,
-                    isCached = isCached
+                    isCached = isCached,
+                    SearchText = SearchText
                 };
 
                 var result = await _userService.GetUserTableAsync(request);
