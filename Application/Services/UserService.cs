@@ -328,6 +328,18 @@ namespace Application.Services
                     }
                 }
 
+                if (!string.IsNullOrEmpty(updateDto.Position) && currentUserRole == "Admin")
+                {
+                    user.WorkInfo.Position = updateDto.Position;
+                    _logger.LogDebug("Updated Position for user {UserId}", userId);
+                }
+
+                if (!string.IsNullOrEmpty(updateDto.Department) && currentUserRole == "Admin")
+                {
+                    user.WorkInfo.Department = updateDto.Department;
+                    _logger.LogDebug("Updated Position for user {UserId}", userId);
+                }
+
                 if (updateDto.Contacts != null && updateDto.Contacts.Any())
                 {
                     foreach (var contact in updateDto.Contacts)

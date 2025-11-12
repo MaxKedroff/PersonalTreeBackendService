@@ -55,5 +55,9 @@ namespace Application.Dtos
         public string? Interests { get; set; }
         public string? Avatar { get; set; } 
         public Dictionary<string, object>? Contacts { get; set; }
+
+        public string? Position { get; set; }
+
+        public string? Department { get; set; }
     }
 }
