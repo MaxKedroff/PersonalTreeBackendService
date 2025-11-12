@@ -32,7 +32,8 @@ namespace API.Controllers
             [FromQuery] string? sort = null,
             [FromQuery] string? positionFilter = null,
             [FromQuery] string? departmentFilter = null,
-            [FromQuery] bool isCached = false)
+            [FromQuery] bool isCached = false,
+            [FromQuery] string SearchText = null)
         {
             try
             {
