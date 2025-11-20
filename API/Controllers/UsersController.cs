@@ -9,6 +9,10 @@ using System.Threading.Tasks;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Контроллер для управления пользователями системы.
+    /// Предоставляет методы получения списка пользователей, детальной информации, иерархии и обновления профиля.
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(AuthOptions.POLICY_USER)]
@@ -25,6 +29,19 @@ namespace API.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Получает таблицу пользователей с поддержкой пагинации, фильтрации, сортировки и поиска.
+        /// </summary>
+        /// <param name="page">Номер страницы (по умолчанию: 1).</param>
+        /// <param name="limit">Количество записей на странице (по умолчанию: 10).</param>
+        /// <param name="sort">Поле для сортировки (например, "name", "position" с префиксом "-" для убывания).</param>
+        /// <param name="positionFilter">Фильтр по должности.</param>
+        /// <param name="departmentFilter">Фильтр по отделу.</param>
+        /// <param name="isCached">Флаг использования кэшированных данных (если доступно).</param>
+        /// <param name="SearchText">Текст для поиска по имени, email или другим полям.</param>
+        /// <returns>Ответ с таблицей пользователей и метаданными пагинации.</returns>
+        /// <response code="200">Возвращает таблицу пользователей.</response>
+        /// <response code="500">Внутренняя ошибка сервера.</response>
         [HttpGet]
         [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<ResponseTableUsersDto>> GetUsers([FromQuery] int page = 1,
@@ -63,6 +80,14 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Получает детальную информацию о пользователе по его идентификатору.
+        /// </summary>
+        /// <param name="userId">Уникальный идентификатор пользователя (GUID).</param>
+        /// <returns>Детали пользователя или ошибка, если пользователь не найден.</returns>
+        /// <response code="200">Информация о пользователе найдена.</response>
+        /// <response code="404">Пользователь не найден.</response>
+        /// <response code="500">Внутренняя ошибка сервера.</response>
         [HttpGet("{userId}")]
         [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<UserDetailInfoDto>> GetUserById(Guid userId)
@@ -93,6 +118,15 @@ namespace API.Controllers
                 return StatusCode(500, new { message = "An error occurred while retrieving user details" });
             }
         }
+
+        /// <summary>
+        /// Устаревший метод поиска пользователей. Рекомендуется использовать <see cref="GetUsers"/> с параметром <c>SearchText</c>.
+        /// </summary>
+        /// <param name="request">Запрос с критериями и значением для поиска.</param>
+        /// <returns>Результаты поиска с количеством совпадений.</returns>
+        /// <response code="200">Поиск выполнен успешно.</response>
+        /// <response code="400">Некорректный запрос (пустое значение, слишком короткий текст и т.д.).</response>
+        /// <response code="500">Ошибка на стороне сервера.</response>
 
         [HttpPost("search")]
         [Authorize(AuthOptions.POLICY_USER)]
@@ -139,6 +173,13 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Получает иерархию отделов и сотрудников в виде древовидной структуры.
+        /// </summary>
+        /// <returns>Иерархия с информацией о руководителях, отделах и подчинённых.</returns>
+        /// <response code="200">Иерархия успешно получена.</response>
+        /// <response code="404">Иерархия не найдена.</response>
+        /// <response code="500">Ошибка при получении данных.</response>
         [HttpGet("hierarchy")]
         [Authorize(AuthOptions.POLICY_USER)]
         [ProducesResponseType(typeof(HierarchyResponseDto), 200)]
@@ -170,6 +211,17 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Обновляет профиль пользователя. Доступно только владельцу профиля или администратору.
+        /// </summary>
+        /// <param name="userId">Идентификатор пользователя, чей профиль обновляется.</param>
+        /// <param name="updateDto">Данные для обновления профиля.</param>
+        /// <returns>Обновлённая информация о пользователе.</returns>
+        /// <response code="200">Профиль успешно обновлён.</response>
+        /// <response code="400">Некорректные данные.</response>
+        /// <response code="403">Доступ запрещён (недостаточно прав).</response>
+        /// <response code="404">Пользователь не найден.</response>
+        /// <response code="500">Ошибка на сервере.</response>
         [HttpPut("{userId}")]
         [Authorize(AuthOptions.POLICY_USER)]
         public async Task<ActionResult<UserDetailInfoDto>> UpdateProfile(Guid userId, [FromBody] UpdateProfileDto updateDto)
@@ -209,6 +261,11 @@ namespace API.Controllers
             }
         }
 
+        /// <summary>
+        /// Извлекает идентификатор текущего пользователя из JWT-токена.
+        /// </summary>
+        /// <returns>Идентификатор пользователя в формате GUID.</returns>
+        /// <exception cref="UnauthorizedAccessException">Выбрасывается, если токен не содержит корректного идентификатора.</exception>
         private Guid GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -219,6 +276,11 @@ namespace API.Controllers
             return userId;
         }
 
+        /// <summary>
+        /// Извлекает роль текущего пользователя из JWT-токена.
+        /// </summary>
+        /// <returns>Строка с ролью пользователя (например, "User", "Admin").</returns>
+        /// <exception cref="UnauthorizedAccessException">Выбрасывается, если роль не указана в токене.</exception>
         private string GetCurrentUserRole()
         {
             var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;

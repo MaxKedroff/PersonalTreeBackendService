@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers
 {
+    /// <summary>
+    /// Контроллер аутентификации. Обрабатывает вход пользователей и выдачу JWT-токенов.
+    /// </summary>
     [Route("api/[controller]")]
     [ApiController]
     public class AuthController : ControllerBase
@@ -19,6 +22,18 @@ namespace API.Controllers
             _logger = logger;
         }
 
+
+        /// <summary>
+        /// Аутентифицирует пользователя по логину и паролю и возвращает JWT-токен при успешной проверке.
+        /// </summary>
+        /// <param name="login">DTO с данными для входа: <see cref="LoginDTO"/> (логин и пароль).</param>
+        /// <returns>
+        /// Возвращает <see cref="IActionResult"/> с объектом, содержащим JWT-токен, если аутентификация успешна.
+        /// В случае ошибки — соответствующий HTTP-статус: 401 (неавторизован) или 500 (внутренняя ошибка).
+        /// </returns>
+        /// <response code="200">Успешная аутентификация. Возвращает JWT-токен.</response>
+        /// <response code="401">Неверные учётные данные или доступ запрещён.</response>
+        /// <response code="500">Внутренняя ошибка сервера при попытке аутентификации.</response>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO login)
         {
