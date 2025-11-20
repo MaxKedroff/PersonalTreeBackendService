@@ -40,18 +40,6 @@ namespace API.Controllers
                 _logger.LogInformation("Getting users table - Page: {Page}, Limit: {Limit}, Sort: {Sort}",
                     page, limit, sort);
 
-                if (page < 1)
-                {
-                    _logger.LogWarning("Invalid page number: {Page}", page);
-                    return BadRequest(new { message = "Page number must be greater than 0" });
-                }
-
-                if (limit < 1 || limit > 100)
-                {
-                    _logger.LogWarning("Invalid limit: {Limit}", limit);
-                    return BadRequest(new { message = "Limit must be between 1 and 100" });
-                }
-
                 var request = new TableRequestDto
                 {
                     page = page,
@@ -82,12 +70,6 @@ namespace API.Controllers
             try
             {
                 _logger.LogInformation("Getting user details for ID: {UserId}", userId);
-
-                if (userId == Guid.Empty)
-                {
-                    _logger.LogWarning("Invalid user ID provided");
-                    return BadRequest(new { message = "Invalid user ID" });
-                }
 
                 var result = await _userService.GetUserDetailAsync(userId);
 
@@ -194,11 +176,6 @@ namespace API.Controllers
         {
             try
             {
-                if (updateDto == null)
-                {
-                    return BadRequest(new { message = "Update data is required" });
-                }
-
                 var currentUserId = GetCurrentUserId();
                 var currentUserRole = GetCurrentUserRole();
 

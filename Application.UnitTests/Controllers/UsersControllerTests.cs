@@ -10,6 +10,7 @@ using API.Controllers;
 using Microsoft.Extensions.Logging;
 using Application.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Application.Validators;
 
 namespace Application.UnitTests.Controllers
 {
@@ -18,11 +19,14 @@ namespace Application.UnitTests.Controllers
         private readonly Mock<IUserService> _mockUserService;
         private readonly Mock<ILogger<UsersController>> _mockLogger;
         private readonly UsersController _controller;
+        private readonly TableRequestDtoValidator _validator;
+
 
         public UsersControllerTests()
         {
             _mockUserService = new Mock<IUserService>();
             _mockLogger = new Mock<ILogger<UsersController>>();
+            _validator = new TableRequestDtoValidator();
             _controller = new UsersController(_mockUserService.Object, _mockLogger.Object);
         }
 
@@ -51,20 +55,29 @@ namespace Application.UnitTests.Controllers
         }
 
         [Fact]
-        public async Task GetUsers_InvalidPage_ReturnsBadRequest()
+        public void GetUsers_InvalidPage_ReturnsValidationError()
         {
-            var result = await _controller.GetUsers(page: 0);
+            var invalidDto = new TableRequestDto { page = 0, Limit = 10 };
+            var validationResult = _validator.Validate(invalidDto);
 
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.NotNull(badRequestResult.Value);
+            Assert.False(validationResult.IsValid);
+            Assert.Contains(validationResult.Errors,
+                error => error.PropertyName == "page" &&
+                        error.ErrorMessage == "Номер страницы должен быть не меньше 1.");
         }
 
+
         [Fact]
-        public async Task GetUsers_InvalidLimit_ReturnsBadRequest()
+        public void GetUsers_InvalidLimit_ReturnsValidationError()
         {
-            var result = await _controller.GetUsers(limit: 0);
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.NotNull(badRequestResult.Value);
+            var invalidDto = new TableRequestDto { page = 1, Limit = 0 };
+
+            var validationResult = _validator.Validate(invalidDto);
+
+            Assert.False(validationResult.IsValid);
+            Assert.Contains(validationResult.Errors,
+                error => error.PropertyName == "Limit" &&
+                        error.ErrorMessage == "Лимит должен быть от 1 до 100.");
         }
 
         [Fact]
@@ -84,11 +97,14 @@ namespace Application.UnitTests.Controllers
         }
 
         [Fact]
-        public async Task GetUserById_InvalidId_ReturnsBadRequest()
+        public void UserIdValidator_EmptyGuid_ReturnsValidationError()
         {
-            var result = await _controller.GetUserById(Guid.Empty);
-            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.NotNull(badRequestResult.Value);
+            var validator = new UserIdValidator();
+            var emptyGuid = Guid.Empty;
+            var validationResult = validator.Validate(emptyGuid);
+            Assert.False(validationResult.IsValid);
+            Assert.Contains(validationResult.Errors,
+                error => error.ErrorMessage == "User ID cannot be empty GUID");
         }
 
         [Fact]

@@ -1,6 +1,7 @@
 ﻿using Prometheus;
 using Application;
 using System;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 using Application.Utils;
@@ -10,6 +11,9 @@ using Serilog;
 using Serilog.Events;
 using Microsoft.IdentityModel.Tokens;
 using Core.Utils;
+using Application.Dtos;
+using Application.Validators;
+using FluentValidation.AspNetCore;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -29,6 +33,11 @@ try
     builder.Host.UseSerilog();
 
     builder.Services.AddControllers();
+    builder.Services.AddValidatorsFromAssemblyContaining<TableRequestDtoValidator>();
+    builder.Services.AddFluentValidationAutoValidation(config =>
+    {
+        config.DisableDataAnnotationsValidation = true;
+    });
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -76,6 +85,8 @@ try
 
     builder.Services.AddApplicationServices(builder.Configuration);
 
+
+
     var app = builder.Build();
 
     using (var scope = app.Services.CreateScope())
@@ -109,12 +120,17 @@ try
     app.UseRouting();
     app.UseHttpMetrics();
 
-    // Global exception handling middleware
     app.Use(async (context, next) =>
     {
         try
         {
             await next();
+        }
+        catch (ValidationException ex) 
+        {
+            Log.Warning(ex, "Validation error occurred");
+            context.Response.StatusCode = 400;
+            await context.Response.WriteAsJsonAsync(new { error = "Validation failed", details = ex.Errors });
         }
         catch (Exception ex)
         {
