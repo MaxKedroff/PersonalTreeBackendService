@@ -83,6 +83,7 @@ namespace Infrastructure.Repositories
             .FirstOrDefaultAsync(u => u.User_id == UserId);
         }
 
+        [Obsolete("Use new version of hierarchy, this is old and will not update later")]
         public async Task<List<User>> GetUsersWithHierarchyAsync()
         {
             return await _context.Users
@@ -253,5 +254,21 @@ namespace Infrastructure.Repositories
             }
         }
 
+        public async Task<List<User>> GetUsersWithHierarchyV2Async()
+        {
+            return await _context.Users
+            .Include(u => u.PersonalInfo)
+            .Include(u => u.WorkInfo)
+            .Include(u => u.ContactInfo)
+            .Include(u => u.Subordinates)
+                .ThenInclude(sub => sub.PersonalInfo)
+            .Include(u => u.Subordinates)
+                .ThenInclude(sub => sub.WorkInfo)
+            .Include(u => u.Subordinates)
+                .ThenInclude(sub => sub.ContactInfo)
+            .Include(u => u.Hierarchy) 
+            .Where(u => u.IsActive)
+            .ToListAsync();
+        }
     }
 }
