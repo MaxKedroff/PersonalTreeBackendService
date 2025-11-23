@@ -13,5 +13,7 @@ namespace Domain.Entities
         public int LevelHierarchy { get; set; }
         public required string TitleHierarchy { get; set; }
         public required string ColorHierarchy { get; set; }
+
+        public Hierarchy Parent { get; set; }
     }
 }

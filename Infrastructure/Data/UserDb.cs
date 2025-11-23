@@ -14,16 +14,52 @@ namespace Infrastructure.Data
     public class UserDb : DbContext
     {
         public DbSet<User> Users { get; set; }
+        public DbSet<Hierarchy> Hierarchies { get; set; }
 
         public UserDb(DbContextOptions<UserDb> options) : base(options)
         {
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<Hierarchy>(entity =>
+            {
+                entity.ToTable("hierarchies");
+                entity.HasKey(e => e.HierarchyId);
+
+                entity.Property(e => e.TitleHierarchy)
+                .HasColumnName("title")
+                .IsRequired()
+                .HasMaxLength(200);
+
+                entity.Property(e => e.ColorHierarchy)
+                    .HasColumnName("color")
+                    .IsRequired()
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.ParentId)
+                    .HasColumnName("parent_id");
+
+                entity.Property(e => e.LevelHierarchy)
+                    .HasColumnName("level")
+                    .IsRequired();
+
+                entity.HasOne<Hierarchy>(h => h.Parent)
+                      .WithMany()
+                      .HasForeignKey(h => h.ParentId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+            });
+
             modelBuilder.Entity<User>(entity =>
             {
                 entity.ToTable("users");
                 entity.HasKey(e => e.User_id);
+
+                entity.HasOne(u => u.Hierarchy)
+                      .WithMany()
+                      .HasForeignKey(u => u.HierarchyId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
 
                 entity.HasOne(u => u.Manager)
                  .WithMany(u => u.Subordinates)
@@ -82,6 +118,13 @@ namespace Infrastructure.Data
                 });
 
                 entity.Property(e => e.Contacts)
+                    .HasColumnType("jsonb")
+                    .HasConversion(
+                        v => v.ToString(Formatting.None),
+                        v => JObject.Parse(v)
+                    );
+
+                entity.Property(e => e.Skills)
                     .HasColumnType("jsonb")
                     .HasConversion(
                         v => v.ToString(Formatting.None),

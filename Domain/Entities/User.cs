@@ -44,6 +44,8 @@ namespace Domain.Entities
         public DateTime Updated_at { get; set; }
 
         public User Manager { get; set; }
+
+        public Hierarchy Hierarchy { get; set; }
         public ICollection<User> Subordinates { get; set; } = new List<User>();
 
         public bool IsInRole(string role) => Role == role;
