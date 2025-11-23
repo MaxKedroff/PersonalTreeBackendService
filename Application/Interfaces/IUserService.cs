@@ -17,7 +17,10 @@ namespace Application.Interfaces
         [Obsolete("Use GetUserTableAsync with search functionality instead")]
         Task<SearchResponseDto> GetSearchResultAsync(SearchRequestDto request);
 
+        [Obsolete]
         Task<HierarchyResponseDto> GetDepartmentHierarchyAsync();
+
+        Task<HierarchyNodeDto> GetDepartmentHierarchyAsyncV2();
 
         Task<UserDetailInfoDto> UpdateUserProfileAsync(Guid userId, Guid currentUserId, string currentUserRole, UpdateProfileDto updateDto);
     }

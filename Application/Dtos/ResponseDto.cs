@@ -88,4 +88,16 @@ namespace Application.Dtos
         public List<DepartmentHierarchyDto> Departments { get; set; } = new List<DepartmentHierarchyDto>();
         public int TotalEmployees { get; set; }
     }
+
+    public class HierarchyNodeDto
+    {
+        public int HierarchyId { get; set; }
+        public int Level { get; set; }
+        public string Title { get; set; }
+        public string Color { get; set; }
+        public List<HierarchyNodeDto> Children { get; set; } = new List<HierarchyNodeDto>();
+
+        public EmployeeHierarchyDto? Manager { get; set; }
+        public List<EmployeeHierarchyDto> Employees { get; set; } = new List<EmployeeHierarchyDto>();
+    }
 }

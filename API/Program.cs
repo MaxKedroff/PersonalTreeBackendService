@@ -1,6 +1,4 @@
 ﻿using Prometheus;
-using Application;
-using System;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
@@ -11,7 +9,6 @@ using Serilog;
 using Serilog.Events;
 using Microsoft.IdentityModel.Tokens;
 using Core.Utils;
-using Application.Dtos;
 using Application.Validators;
 using FluentValidation.AspNetCore;
 
@@ -95,6 +92,8 @@ try
         Log.Information("Applying database migrations...");
         dbContext.Database.Migrate();
         Log.Information("Database migrations applied successfully");
+        HierarchySeeder.SeedHierarchies(dbContext);
+        Log.Information("Seed constant Data");
     }
 
     app.UseSwagger(c =>

@@ -174,13 +174,14 @@ namespace API.Controllers
         }
 
         /// <summary>
-        /// Получает иерархию отделов и сотрудников в виде древовидной структуры.
+        /// Получает иерархию отделов и сотрудников в виде древовидной структуры. (метод устарел, использовать hierarchyV2)
         /// </summary>
         /// <returns>Иерархия с информацией о руководителях, отделах и подчинённых.</returns>
         /// <response code="200">Иерархия успешно получена.</response>
         /// <response code="404">Иерархия не найдена.</response>
         /// <response code="500">Ошибка при получении данных.</response>
         [HttpGet("hierarchy")]
+        [Obsolete("use hierarchyV2 instead of hierarchy")]
         [Authorize(AuthOptions.POLICY_USER)]
         [ProducesResponseType(typeof(HierarchyResponseDto), 200)]
         [ProducesResponseType(404)]
@@ -208,6 +209,30 @@ namespace API.Controllers
             {
                 _logger.LogError(ex, "Error occurred while retrieving organizational hierarchy");
                 return StatusCode(500, new { message = "An error occurred while retrieving organizational hierarchy" });
+            }
+        }
+
+        /// <summary>
+        /// Получает иерархию отделов и сотрудников в виде древовидной структуры.
+        /// </summary>
+        /// <returns>Иерархия с информацией о руководителях, отделах и подчинённых.</returns>
+        /// <response code="200">Иерархия успешно получена.</response>
+        /// <response code="404">Иерархия не найдена.</response>
+        /// <response code="500">Ошибка при получении данных.</response>
+        [HttpGet("hierarchyV2")]
+        [Authorize(AuthOptions.POLICY_USER)]
+        [ProducesResponseType(typeof(HierarchyNodeDto), 200)]
+        public async Task<ActionResult<HierarchyNodeDto>> GetDepartmentHierarchyV2()
+        {
+            try
+            {
+                var hierarchy = await _userService.GetDepartmentHierarchyAsyncV2();
+                return Ok(hierarchy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при построении иерархии");
+                return StatusCode(500, new { message = "Ошибка при построении иерархии" });
             }
         }
 

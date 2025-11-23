@@ -14,6 +14,7 @@ namespace Infrastructure.Repositories
     {
 
         private UserDb _context;
+        
 
         public UserRepository(UserDb context)
         {
@@ -269,6 +270,14 @@ namespace Infrastructure.Repositories
             .Include(u => u.Hierarchy) 
             .Where(u => u.IsActive)
             .ToListAsync();
+        }
+
+        public async Task<List<Hierarchy>> GetHierarchiesList()
+        {
+            return await _context.Hierarchies
+                .AsNoTracking()
+                .OrderBy(h => h.LevelHierarchy)
+                .ToListAsync();
         }
     }
 }

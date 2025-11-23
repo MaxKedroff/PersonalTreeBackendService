@@ -3,6 +3,7 @@ using Application.Interfaces;
 using Application.Utils;
 using Domain.Entities;
 using Domain.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System;
@@ -369,6 +370,67 @@ namespace Application.Services
             }
         }
 
+        public async Task<HierarchyNodeDto> GetDepartmentHierarchyAsyncV2()
+        {
+            var hierarchies = await _userRepository.GetHierarchiesList();
+            var users = await _userRepository.GetUsersWithHierarchyV2Async();
 
+            var hierarchyDict = hierarchies.ToDictionary(h => h.HierarchyId, h => new HierarchyNodeDto
+            {
+                HierarchyId = h.HierarchyId,
+                Level = h.LevelHierarchy,
+                Title = h.TitleHierarchy,
+                Color = h.ColorHierarchy
+            });
+
+            var root = hierarchyDict.Values.FirstOrDefault(h => h.Level == 1);
+            if (root == null)
+            {
+                root = new HierarchyNodeDto { Level = 1, Title = "UDV GROUP", Color = "#000000" };
+                hierarchyDict[-1] = root;
+            }
+
+            foreach (var h in hierarchies.Where(h => h.ParentId.HasValue))
+            {
+                if (hierarchyDict.TryGetValue(h.ParentId.Value, out var parent) &&
+            hierarchyDict.TryGetValue(h.HierarchyId, out var child))
+                {
+                    parent.Children.Add(child);
+                }
+            }
+
+            foreach (var node in hierarchyDict.Values)
+            {
+                if (node.Level >= 4 && node.Children.Count == 0) 
+                {
+                    var usersInNode = users
+                        .Where(u => u.HierarchyId.HasValue && u.HierarchyId.Value == node.HierarchyId)
+                        .ToList();
+
+                    if (!usersInNode.Any()) continue;
+
+                    var ceo = usersInNode.FirstOrDefault(u =>
+                        !u.Manager_id.HasValue ||
+                        !usersInNode.Any(m => m.User_id == u.Manager_id));
+
+                    if (ceo != null)
+                    {
+                        node.Manager = Mapper.MapEmployeeToHierarchyDto(ceo, usersInNode);
+                        var subordinates = usersInNode.Where(u => u.Manager_id == ceo.User_id).ToList();
+                        node.Employees = subordinates.Select(u => Mapper.MapEmployeeToHierarchyDto(u, usersInNode)).ToList();
+                    }
+                    else
+                    {
+                        var first = usersInNode.First();
+                        node.Manager = Mapper.MapEmployeeToHierarchyDto(first, usersInNode);
+                        node.Employees = usersInNode
+                            .Where(u => u.User_id != first.User_id)
+                            .Select(u => Mapper.MapEmployeeToHierarchyDto(u, usersInNode))
+                            .ToList();
+                    }
+                }
+            }
+            return root;
+        }
     }
 }
