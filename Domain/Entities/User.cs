@@ -22,6 +22,7 @@ namespace Domain.Entities
         public string Login { get; set; }
         [Required]
         public string Password { get; set; }
+        public int? HierarchyId { get; set; }
         public Guid? Manager_id { get; set; }
         public string Role { get; set; } = AuthOptions.ROLE_USER; 
         public PersonalInfo PersonalInfo { get; set; } = new PersonalInfo();
@@ -29,6 +30,9 @@ namespace Domain.Entities
         public ContactInfo ContactInfo { get; set; } = new ContactInfo();
         [Column(TypeName = "jsonb")]
         public JObject Contacts { get; set; } = new JObject();
+
+        [Column(TypeName = "jsonb")]
+        public JObject Skills { get; set; } = new JObject();
 
         public string SamAccountName { get; set; } 
         public string Email { get; set; }
