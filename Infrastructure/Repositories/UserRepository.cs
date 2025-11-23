@@ -274,10 +274,12 @@ namespace Infrastructure.Repositories
 
         public async Task<List<Hierarchy>> GetHierarchiesList()
         {
-            return await _context.Hierarchies
+            var result = await _context.Hierarchies
                 .AsNoTracking()
                 .OrderBy(h => h.LevelHierarchy)
                 .ToListAsync();
+
+            return result ?? new List<Hierarchy>();
         }
     }
 }

@@ -380,7 +380,8 @@ namespace Application.Services
                 HierarchyId = h.HierarchyId,
                 Level = h.LevelHierarchy,
                 Title = h.TitleHierarchy,
-                Color = h.ColorHierarchy
+                Color = h.ColorHierarchy,
+                Children = new List<HierarchyNodeDto>()
             });
 
             var root = hierarchyDict.Values.FirstOrDefault(h => h.Level == 1);
