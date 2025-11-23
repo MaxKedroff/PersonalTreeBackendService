@@ -18,9 +18,12 @@ namespace Domain.Interfaces
         Task<User> GetUsersByIdAsync(Guid UserId);
         Task<List<User>> GetSearchResultAsync(string criteria, string searchString, int queryAmount);
         Task<List<User>> GetUsersWithHierarchyAsync();
+        Task<List<User>> GetUsersWithHierarchyV2Async();
         Task<User> GetCeoAsync();
         Task<User> GetUserByLoginAsync(string login);
         Task UpdateUserAsync(User user);
+
+        Task<List<Hierarchy>> GetHierarchiesList();
 
     }
 }
