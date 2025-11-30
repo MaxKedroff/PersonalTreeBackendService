@@ -287,6 +287,75 @@ namespace API.Controllers
         }
 
         /// <summary>
+        /// Перемещает пользователя в другой отдел (иерархию).
+        /// </summary>
+        /// <param name="moveRequest">Запрос на перемещение пользователя.</param>
+        /// <returns>Обновленная информация о пользователе.</returns>
+        /// <response code="200">Пользователь успешно перемещен.</response>
+        /// <response code="400">Некорректные данные запроса.</response>
+        /// <response code="403">Доступ запрещен (недостаточно прав).</response>
+        /// <response code="404">Пользователь или отдел не найден.</response>
+        /// <response code="500">Ошибка на сервере.</response>
+        [HttpPost("move")]
+        [Authorize(AuthOptions.POLICY_USER)]
+        public async Task<ActionResult<UserDetailInfoDto>> MoveUserToHierarchy([FromBody] MoveUserRequestDto moveRequest)
+        {
+            try
+            {
+                _logger.LogInformation("Move user request - User: {UserId}, TargetHierarchy: {TargetHierarchyId}",
+                    moveRequest.UserId, moveRequest.TargetHierarchyId);
+
+                if (moveRequest == null)
+                {
+                    _logger.LogWarning("Move request is null");
+                    return BadRequest(new { message = "Move request cannot be null" });
+                }
+
+                if (moveRequest.UserId == Guid.Empty)
+                {
+                    _logger.LogWarning("Invalid user ID in move request");
+                    return BadRequest(new { message = "Invalid user ID" });
+                }
+
+                if (moveRequest.TargetHierarchyId <= 0)
+                {
+                    _logger.LogWarning("Invalid hierarchy ID in move request: {HierarchyId}", moveRequest.TargetHierarchyId);
+                    return BadRequest(new { message = "Invalid hierarchy ID" });
+                }
+
+                var currentUserId = GetCurrentUserId();
+                var currentUserRole = GetCurrentUserRole();
+
+                var result = await _userService.MoveUserToHierarchyAsync(moveRequest, currentUserId, currentUserRole);
+
+                _logger.LogInformation("User moved successfully - User: {UserId}, TargetHierarchy: {TargetHierarchyId}",
+                    moveRequest.UserId, moveRequest.TargetHierarchyId);
+
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Unauthorized move attempt - User: {UserId}", GetCurrentUserId());
+                return Forbid(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning("Resource not found for move: {Message}", ex.Message);
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Invalid operation in move: {Message}", ex.Message);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while moving user {UserId}", moveRequest?.UserId);
+                return StatusCode(500, new { message = "An error occurred while moving user" });
+            }
+        }
+
+        /// <summary>
         /// Извлекает идентификатор текущего пользователя из JWT-токена.
         /// </summary>
         /// <returns>Идентификатор пользователя в формате GUID.</returns>

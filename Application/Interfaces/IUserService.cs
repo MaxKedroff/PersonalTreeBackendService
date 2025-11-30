@@ -23,5 +23,7 @@ namespace Application.Interfaces
         Task<HierarchyNodeDto> GetDepartmentHierarchyAsyncV2();
 
         Task<UserDetailInfoDto> UpdateUserProfileAsync(Guid userId, Guid currentUserId, string currentUserRole, UpdateProfileDto updateDto);
+
+        Task<UserDetailInfoDto> MoveUserToHierarchyAsync(MoveUserRequestDto moveRequest, Guid currentUserId, string currentUserRole);
     }
 }

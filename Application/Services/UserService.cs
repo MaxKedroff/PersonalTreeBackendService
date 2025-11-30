@@ -433,5 +433,91 @@ namespace Application.Services
             }
             return root;
         }
+
+        public async Task<UserDetailInfoDto> MoveUserToHierarchyAsync(MoveUserRequestDto moveRequest, Guid currentUserId, string currentUserRole)
+        {
+            _logger.LogInformation("Moving user to hierarchy - User: {UserId}, TargetHierarchy: {TargetHierarchyId}, Current User: {CurrentUserId}, Role: {Role}",
+        moveRequest.UserId, moveRequest.TargetHierarchyId, currentUserId, currentUserRole);
+            try
+            {
+                if (currentUserRole != "Admin" && currentUserRole != "Hr")
+                {
+                    _logger.LogWarning("User {CurrentUserId} with role {Role} attempted to move user without permission",
+                currentUserId, currentUserRole);
+                    throw new UnauthorizedAccessException("You don't have permission to move users");
+                }
+
+                var userToMove = await _userRepository.GetUsersByIdAsync(moveRequest.UserId);
+                if (userToMove == null)
+                {
+                    _logger.LogWarning("User not found for move: {UserId}", moveRequest.UserId);
+                    throw new KeyNotFoundException($"User with ID {moveRequest.UserId} not found");
+                }
+
+                if (userToMove.Subordinates?.Any() == true)
+                {
+                    _logger.LogWarning("Cannot move CEO user with subordinates: {UserId}", moveRequest.UserId);
+                    throw new InvalidOperationException("Cannot move CEO user with subordinates");
+                }
+                var targetHierarchy = await _userRepository.GetHierarchyByIdAsync(moveRequest.TargetHierarchyId);
+                if (targetHierarchy == null)
+                {
+                    _logger.LogWarning("Target hierarchy not found: {HierarchyId}", moveRequest.TargetHierarchyId);
+                    throw new KeyNotFoundException($"Target hierarchy with ID {moveRequest.TargetHierarchyId} not found");
+                }
+                if (targetHierarchy.LevelHierarchy < 4 || targetHierarchy.LevelHierarchy > 5)
+                {
+                    _logger.LogWarning("Cannot move user to non-leaf hierarchy level: {Level}", targetHierarchy.LevelHierarchy);
+                    throw new InvalidOperationException("Can only move users to leaf hierarchies (levels 4-5)");
+                }
+                Guid? newManagerId = moveRequest.NewManagerId;
+                if (newManagerId.HasValue)
+                {
+                    var newManager = await _userRepository.GetUsersByIdAsync(newManagerId.Value);
+                    if (newManager == null)
+                    {
+                        _logger.LogWarning("New manager not found: {ManagerId}", newManagerId.Value);
+                        throw new KeyNotFoundException($"New manager with ID {newManagerId.Value} not found");
+                    }
+
+                    if (newManager.HierarchyId != moveRequest.TargetHierarchyId)
+                    {
+                        _logger.LogWarning("New manager is not in target hierarchy: {ManagerHierarchy} != {TargetHierarchy}",
+                    newManager.HierarchyId, moveRequest.TargetHierarchyId);
+                        throw new InvalidOperationException("New manager must be in the target hierarchy");
+                    }
+                }
+                else
+                {
+                    var targetHierarchyCeo = await _userRepository.GetCeoByHierarchyIdAsync(moveRequest.TargetHierarchyId);
+                    if (targetHierarchyCeo != null)
+                    {
+                        newManagerId = targetHierarchyCeo.User_id;
+                        _logger.LogDebug("Auto-assigned CEO as manager: {ManagerId}", newManagerId);
+                    }
+                }
+
+                userToMove.HierarchyId = moveRequest.TargetHierarchyId;
+                userToMove.Manager_id = newManagerId;
+                userToMove.Updated_at = DateTime.UtcNow;
+
+                if (userToMove.WorkInfo != null)
+                {
+                    userToMove.WorkInfo.Department = targetHierarchy.TitleHierarchy;
+                }
+
+                await _userRepository.UpdateUserAsync(userToMove);
+
+                _logger.LogInformation("User moved successfully - User: {UserId}, TargetHierarchy: {TargetHierarchyId}, Manager: {ManagerId}",
+            moveRequest.UserId, moveRequest.TargetHierarchyId, newManagerId);
+
+                return Mapper.MapUserToUserDetailInfoDto(userToMove);
+            }catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while moving user {UserId} to hierarchy {TargetHierarchyId}",
+            moveRequest.UserId, moveRequest.TargetHierarchyId);
+                throw;
+            }
+        }
     }
 }
