@@ -25,5 +25,8 @@ namespace Domain.Interfaces
 
         Task<List<Hierarchy>> GetHierarchiesList();
 
+        Task<Hierarchy> GetHierarchyByIdAsync(int hierarchyId);
+        Task<User> GetCeoByHierarchyIdAsync(int hierarchyId);
+
     }
 }

@@ -281,5 +281,22 @@ namespace Infrastructure.Repositories
 
             return result ?? new List<Hierarchy>();
         }
+
+        public async Task<Hierarchy> GetHierarchyByIdAsync(int hierarchyId)
+        {
+            return await _context.Hierarchies
+                .FirstOrDefaultAsync(h => h.HierarchyId == hierarchyId);
+        }
+
+        public async Task<User> GetCeoByHierarchyIdAsync(int hierarchyId)
+        {
+            return await _context.Users
+                .Include(u => u.PersonalInfo)
+                .Include(u => u.WorkInfo)
+                .Include(u => u.ContactInfo)
+                .FirstOrDefaultAsync(u => u.HierarchyId == hierarchyId &&
+                                         u.Manager_id == null &&
+                                         u.IsActive);
+        }
     }
 }

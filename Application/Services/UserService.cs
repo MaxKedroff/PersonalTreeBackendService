@@ -433,5 +433,343 @@ namespace Application.Services
             }
             return root;
         }
+
+        public async Task<UserDetailInfoDto> MoveUserToHierarchyAsync(MoveUserRequestDto moveRequest, Guid currentUserId, string currentUserRole)
+        {
+            _logger.LogInformation("Moving user to hierarchy - User: {UserId}, TargetHierarchy: {TargetHierarchyId}, SwapWith: {SwapWithUserId}, BecomeCeo: {BecomeCeo}",
+                moveRequest.UserId, moveRequest.TargetHierarchyId, moveRequest.SwapWithUserId, moveRequest.BecomeCeo);
+
+            try
+            {
+                if (currentUserRole != "Admin" && currentUserRole != "Hr")
+                {
+                    _logger.LogWarning("User {CurrentUserId} with role {Role} attempted to move user without permission",
+                        currentUserId, currentUserRole);
+                    throw new UnauthorizedAccessException("You don't have permission to move users");
+                }
+
+                var userToMove = await _userRepository.GetUsersByIdAsync(moveRequest.UserId);
+                if (userToMove == null)
+                {
+                    _logger.LogWarning("User not found for move: {UserId}", moveRequest.UserId);
+                    throw new KeyNotFoundException($"User with ID {moveRequest.UserId} not found");
+                }
+
+                var targetHierarchy = await _userRepository.GetHierarchyByIdAsync(moveRequest.TargetHierarchyId);
+                if (targetHierarchy == null)
+                {
+                    _logger.LogWarning("Target hierarchy not found: {HierarchyId}", moveRequest.TargetHierarchyId);
+                    throw new KeyNotFoundException($"Target hierarchy with ID {moveRequest.TargetHierarchyId} not found");
+                }
+
+                if (targetHierarchy.LevelHierarchy < 4 || targetHierarchy.LevelHierarchy > 5)
+                {
+                    _logger.LogWarning("Cannot move user to non-leaf hierarchy level: {Level}", targetHierarchy.LevelHierarchy);
+                    throw new InvalidOperationException("Can only move users to leaf hierarchies (levels 4-5)");
+                }
+
+                if (moveRequest.BecomeCeo)
+                {
+                    if (userToMove.HierarchyId != targetHierarchy.HierarchyId)
+                    {
+                        throw new InvalidOperationException("Must be in the target department to become CEO");
+                    }
+                    await HandleBecomeCeoScenario(userToMove, targetHierarchy);
+                }
+                else if (moveRequest.SwapWithUserId.HasValue)
+                {
+                    await HandleSwapScenario(userToMove, moveRequest.SwapWithUserId.Value, targetHierarchy);
+                }
+                else
+                {
+                    await HandleRegularMoveScenario(userToMove, moveRequest.NewManagerId, targetHierarchy);
+                }
+
+
+                _logger.LogInformation("User moved successfully - User: {UserId}, TargetHierarchy: {TargetHierarchyId}",
+                    moveRequest.UserId, moveRequest.TargetHierarchyId);
+
+                return Mapper.MapUserToUserDetailInfoDto(userToMove);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while moving user {UserId} to hierarchy {TargetHierarchyId}",
+                    moveRequest.UserId, moveRequest.TargetHierarchyId);
+                throw;
+            }
+        }
+
+        private async Task HandleRegularMoveScenario(User userToMove, Guid? newManagerId, Hierarchy targetHierarchy)
+        {
+            _logger.LogInformation("Handling regular move scenario - User: {UserId}", userToMove.User_id);
+
+            if (userToMove.Subordinates?.Any() == true && userToMove.Manager_id == null)
+            {
+                _logger.LogWarning("Cannot move CEO user with subordinates: {UserId}", userToMove.User_id);
+                throw new InvalidOperationException("Cannot move CEO user with subordinates. Use SWAP instead.");
+            }
+
+            Guid? actualManagerId = newManagerId;
+            if (!actualManagerId.HasValue)
+            {
+                var targetHierarchyCeo = await _userRepository.GetCeoByHierarchyIdAsync(targetHierarchy.HierarchyId);
+                if (targetHierarchyCeo != null)
+                {
+                    actualManagerId = targetHierarchyCeo.User_id;
+                    _logger.LogDebug("Auto-assigned CEO as manager: {ManagerId}", actualManagerId);
+                }
+            }
+            else
+            {
+                var specifiedManager = await _userRepository.GetUsersByIdAsync(actualManagerId.Value);
+                if (specifiedManager?.HierarchyId != targetHierarchy.HierarchyId)
+                {
+                    throw new InvalidOperationException("Specified manager must be in the target hierarchy");
+                }
+            }
+
+            userToMove.HierarchyId = targetHierarchy.HierarchyId;
+            userToMove.Manager_id = actualManagerId;
+            userToMove.Updated_at = DateTime.UtcNow;
+
+            if (userToMove.WorkInfo != null)
+            {
+                userToMove.WorkInfo.Department = targetHierarchy.TitleHierarchy;
+            }
+
+            await _userRepository.UpdateUserAsync(userToMove);
+
+            _logger.LogInformation("Regular move completed - User: {UserId}, Manager: {ManagerId}",
+                userToMove.User_id, actualManagerId);
+        }
+
+        private async Task HandleSwapScenario(User userToMove, Guid swapWithUserId, Hierarchy targetHierarchy)
+        {
+            _logger.LogInformation("Handling SWAP scenario - User: {UserId}, SwapWith: {SwapWithUserId}",
+                userToMove.User_id, swapWithUserId);
+
+            var swapWithUser = await _userRepository.GetUsersByIdAsync(swapWithUserId);
+            if (swapWithUser == null)
+            {
+                throw new KeyNotFoundException($"User to swap with (ID: {swapWithUserId}) not found");
+            }
+
+            bool areRelated = userToMove.Manager_id == swapWithUserId ||
+                             swapWithUser.Manager_id == userToMove.User_id ||
+                             userToMove.Manager_id == swapWithUser.Manager_id;
+
+            if (!areRelated)
+            {
+                throw new InvalidOperationException("Can only swap with manager or subordinate");
+            }
+
+            var tempHierarchyId = userToMove.HierarchyId;
+            var tempManagerId = userToMove.Manager_id;
+            var tempDepartment = userToMove.WorkInfo?.Department;
+            var tempSubordinates = userToMove.Subordinates?.ToList() ?? new List<User>();
+
+            var tempSwapHierarchyId = swapWithUser.HierarchyId;
+            var tempSwapManagerId = swapWithUser.Manager_id;
+            var tempSwapDepartment = swapWithUser.WorkInfo?.Department;
+            var tempSwapSubordinates = swapWithUser.Subordinates?.ToList() ?? new List<User>();
+
+            userToMove.HierarchyId = tempSwapHierarchyId;
+            userToMove.Manager_id = tempSwapManagerId;
+            userToMove.Updated_at = DateTime.UtcNow;
+
+            if (userToMove.WorkInfo != null)
+            {
+                userToMove.WorkInfo.Department = swapWithUser.WorkInfo?.Department ?? targetHierarchy.TitleHierarchy;
+            }
+
+            swapWithUser.HierarchyId = tempHierarchyId;
+            swapWithUser.Manager_id = tempManagerId;
+            swapWithUser.Updated_at = DateTime.UtcNow;
+
+            if (swapWithUser.WorkInfo != null)
+            {
+                swapWithUser.WorkInfo.Department = tempDepartment ?? swapWithUser.WorkInfo.Department;
+            }
+
+            await RedistributeSubordinatesAfterSwap(userToMove, swapWithUser, tempSubordinates, tempSwapSubordinates);
+
+            await _userRepository.UpdateUserAsync(userToMove);
+            await _userRepository.UpdateUserAsync(swapWithUser);
+
+            _logger.LogInformation("SWAP completed successfully - Users swapped: {User1} and {User2}",
+                userToMove.User_id, swapWithUserId);
+        }
+        private async Task HandleBecomeCeoScenario(User userToMove, Hierarchy targetHierarchy)
+        {
+            _logger.LogInformation("Handling Become CEO scenario - User: {UserId}, TargetHierarchy: {HierarchyId}",
+                userToMove.User_id, targetHierarchy.HierarchyId);
+
+            if (userToMove.HierarchyId != targetHierarchy.HierarchyId)
+            {
+                throw new InvalidOperationException("Can only become CEO within current department. Move to department first.");
+            }
+
+            var currentCeo = await _userRepository.GetCeoByHierarchyIdAsync(targetHierarchy.HierarchyId);
+
+            if (currentCeo == null)
+            {
+                throw new InvalidOperationException("No CEO found in the target department");
+            }
+
+            bool isSubordinate = userToMove.Manager_id == currentCeo.User_id;
+            if (!isSubordinate)
+            {
+                throw new InvalidOperationException("Can only become CEO if you are subordinate of current CEO");
+            }
+
+            _logger.LogInformation("Performing CEO promotion SWAP - User: {UserId}, CurrentCEO: {CurrentCeoId}",
+                userToMove.User_id, currentCeo.User_id);
+
+            var userSubordinates = userToMove.Subordinates?.ToList() ?? new List<User>();
+            var ceoSubordinates = currentCeo.Subordinates?
+                .Where(s => s.User_id != userToMove.User_id)
+                .ToList() ?? new List<User>();
+
+            userToMove.Manager_id = null; 
+            userToMove.Updated_at = DateTime.UtcNow;
+
+            currentCeo.Manager_id = userToMove.User_id;
+            currentCeo.Updated_at = DateTime.UtcNow;
+
+            foreach (var subordinate in ceoSubordinates)
+            {
+                subordinate.Manager_id = userToMove.User_id;
+                subordinate.Updated_at = DateTime.UtcNow;
+                await _userRepository.UpdateUserAsync(subordinate);
+                _logger.LogDebug("Reassigned CEO's subordinate {SubordinateId} to new CEO {NewCeoId}",
+                    subordinate.User_id, userToMove.User_id);
+            }
+
+            foreach (var subordinate in userSubordinates)
+            {
+                subordinate.Manager_id = currentCeo.User_id;
+                subordinate.Updated_at = DateTime.UtcNow;
+                await _userRepository.UpdateUserAsync(subordinate);
+                _logger.LogDebug("Reassigned user's subordinate {SubordinateId} to former CEO {FormerCeoId}",
+                    subordinate.User_id, currentCeo.User_id);
+            }
+
+            await _userRepository.UpdateUserAsync(userToMove);
+            await _userRepository.UpdateUserAsync(currentCeo);
+
+            _logger.LogInformation("CEO promotion completed - New CEO: {NewCeoId}, Former CEO: {FormerCeoId}",
+                userToMove.User_id, currentCeo.User_id);
+        }
+
+
+        private async Task RedistributeSubordinatesAfterSwap(User user1, User user2,
+    List<User> user1OriginalSubordinates, List<User> user2OriginalSubordinates)
+        {
+            _logger.LogInformation("Redistributing subordinates after SWAP - User1: {User1Id}, User2: {User2Id}",
+                user1.User_id, user2.User_id);
+
+            if (user2OriginalSubordinates.Any(s => s.User_id == user1.User_id))
+            {
+                _logger.LogDebug("User1 was subordinate of User2 - handling subordinate-manager swap");
+
+                foreach (var subordinate in user2OriginalSubordinates.Where(s => s.User_id != user1.User_id))
+                {
+                    subordinate.Manager_id = user1.User_id;
+                    subordinate.HierarchyId = user1.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user1.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Reassigned subordinate {SubordinateId} from {OldManager} to {NewManager}",
+                        subordinate.User_id, user2.User_id, user1.User_id);
+                }
+
+                user2.Manager_id = user1.User_id;
+
+                foreach (var subordinate in user1OriginalSubordinates)
+                {
+                    subordinate.HierarchyId = user1.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user1.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Updated subordinate {SubordinateId} department for user1",
+                        subordinate.User_id);
+                }
+            }
+            else if (user1OriginalSubordinates.Any(s => s.User_id == user2.User_id))
+            {
+                _logger.LogDebug("User2 was subordinate of User1 - handling manager-subordinate swap");
+
+                foreach (var subordinate in user1OriginalSubordinates.Where(s => s.User_id != user2.User_id))
+                {
+                    subordinate.Manager_id = user2.User_id;
+                    subordinate.HierarchyId = user2.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user2.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Reassigned subordinate {SubordinateId} from {OldManager} to {NewManager}",
+                        subordinate.User_id, user1.User_id, user2.User_id);
+                }
+
+                user1.Manager_id = user2.User_id;
+
+                foreach (var subordinate in user2OriginalSubordinates)
+                {
+                    subordinate.HierarchyId = user2.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user2.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Updated subordinate {SubordinateId} department for user2",
+                        subordinate.User_id);
+                }
+            }
+            else if (user1.Manager_id == user2.Manager_id)
+            {
+                _logger.LogDebug("Users were siblings - exchanging subordinates between departments");
+
+                foreach (var subordinate in user1OriginalSubordinates)
+                {
+                    subordinate.HierarchyId = user2.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user2.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Updated subordinate {SubordinateId} department to {NewDepartment}",
+                        subordinate.User_id, user2.HierarchyId);
+                }
+
+                foreach (var subordinate in user2OriginalSubordinates)
+                {
+                    subordinate.HierarchyId = user1.HierarchyId;
+                    subordinate.Updated_at = DateTime.UtcNow;
+                    if (subordinate.WorkInfo != null)
+                    {
+                        subordinate.WorkInfo.Department = user1.WorkInfo?.Department ?? subordinate.WorkInfo.Department;
+                    }
+                    await _userRepository.UpdateUserAsync(subordinate);
+                    _logger.LogDebug("Updated subordinate {SubordinateId} department to {NewDepartment}",
+                        subordinate.User_id, user1.HierarchyId);
+                }
+            }
+            else
+            {
+                _logger.LogDebug("Other swap scenario - subordinates remain with their current managers");
+            }
+
+            _logger.LogInformation("Subordinate redistribution completed");
+        }
     }
 }

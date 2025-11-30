@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -59,5 +60,21 @@ namespace Application.Dtos
         public string? Position { get; set; }
 
         public string? Department { get; set; }
+    }
+
+    public class MoveUserRequestDto
+    {
+        [Required]
+        public Guid UserId { get; set; }
+
+
+        [Required]
+        public int TargetHierarchyId { get; set; }
+
+        public Guid? NewManagerId { get; set; }
+
+        public Guid? SwapWithUserId { get; set; }
+
+        public bool BecomeCeo { get; set; } = false;
     }
 }
