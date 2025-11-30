@@ -72,5 +72,9 @@ namespace Application.Dtos
         public int TargetHierarchyId { get; set; }
 
         public Guid? NewManagerId { get; set; }
+
+        public Guid? SwapWithUserId { get; set; }
+
+        public bool BecomeCeo { get; set; } = false;
     }
 }
