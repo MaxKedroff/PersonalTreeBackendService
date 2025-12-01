@@ -98,6 +98,6 @@ namespace Application.Dtos
         public List<HierarchyNodeDto> Children { get; set; } = new List<HierarchyNodeDto>();
 
         public EmployeeHierarchyDto? Manager { get; set; }
-        public List<EmployeeHierarchyDto> Employees { get; set; } = new List<EmployeeHierarchyDto>();
+        public List<EmployeeFlatDto> Employees { get; set; } = new List<EmployeeFlatDto>();
     }
 }

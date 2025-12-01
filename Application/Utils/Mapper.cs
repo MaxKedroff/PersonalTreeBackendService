@@ -73,13 +73,13 @@ namespace Application.Utils
             };
         }
 
-        public static EmployeeHierarchyDto MapEmployeeToHierarchyDto(User user, List<User> allUsers, HashSet<Guid> processedUsers = null, int maxDepth = 10)
+        public static EmployeeHierarchyDto MapEmployeeToHierarchyDto(User user, List<User> allUsers,
+        HashSet<Guid> processedUsers = null, int maxDepth = 10)
         {
             if (user == null) return null;
 
             processedUsers ??= new HashSet<Guid>();
 
-            // Защита от циклических ссылок
             if (processedUsers.Contains(user.User_id) || maxDepth <= 0)
                 return null;
 
@@ -93,7 +93,6 @@ namespace Application.Utils
                 AvatarUrl = user.ContactInfo?.Avatar
             };
 
-            // Рекурсивно маппим подчиненных
             var subordinates = allUsers
                 .Where(u => u.Manager_id == user.User_id &&
                            u.WorkInfo?.Department == user.WorkInfo?.Department)
@@ -101,7 +100,8 @@ namespace Application.Utils
 
             foreach (var subordinate in subordinates)
             {
-                var subordinateDto = MapEmployeeToHierarchyDto(subordinate, allUsers, processedUsers, maxDepth - 1);
+                var subordinateDto = MapEmployeeToHierarchyDto(subordinate, allUsers,
+                    processedUsers, maxDepth - 1);
                 if (subordinateDto != null)
                 {
                     dto.Subordinates.Add(subordinateDto);
@@ -111,5 +111,19 @@ namespace Application.Utils
             processedUsers.Remove(user.User_id);
             return dto;
         }
+
+        public static EmployeeFlatDto MapEmployeeToFlatDto(User user)
+        {
+            if (user == null) return null;
+
+            return new EmployeeFlatDto
+            {
+                UserId = user.User_id,
+                UserName = user.GetFullName() ?? user.Login,
+                Position = user.WorkInfo?.Position,
+                AvatarUrl = user.ContactInfo?.Avatar
+            };
+        }
+
     }
 }
