@@ -418,7 +418,11 @@ namespace Application.Services
                     {
                         node.Manager = Mapper.MapEmployeeToHierarchyDto(ceo, usersInNode);
                         var subordinates = usersInNode.Where(u => u.Manager_id == ceo.User_id).ToList();
-                        node.Employees = subordinates.Select(u => Mapper.MapEmployeeToHierarchyDto(u, usersInNode)).ToList();
+                        node.Employees = usersInNode
+                            .Where(u => u.User_id != ceo.User_id)
+                            .Select(u => Mapper.MapEmployeeToFlatDto(u)) 
+                            .ToList();
+
                     }
                     else
                     {
@@ -426,7 +430,7 @@ namespace Application.Services
                         node.Manager = Mapper.MapEmployeeToHierarchyDto(first, usersInNode);
                         node.Employees = usersInNode
                             .Where(u => u.User_id != first.User_id)
-                            .Select(u => Mapper.MapEmployeeToHierarchyDto(u, usersInNode))
+                            .Select(u => Mapper.MapEmployeeToFlatDto(u))
                             .ToList();
                     }
                 }

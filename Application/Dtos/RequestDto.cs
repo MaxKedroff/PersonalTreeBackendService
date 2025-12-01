@@ -77,4 +77,12 @@ namespace Application.Dtos
 
         public bool BecomeCeo { get; set; } = false;
     }
+
+    public class EmployeeFlatDto
+    {
+        public Guid UserId { get; set; }
+        public string UserName { get; set; }
+        public string Position { get; set; }
+        public string AvatarUrl { get; set; }
+    }
 }
