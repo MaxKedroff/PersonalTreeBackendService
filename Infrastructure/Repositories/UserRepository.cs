@@ -269,6 +269,7 @@ namespace Infrastructure.Repositories
                 .ThenInclude(sub => sub.ContactInfo)
             .Include(u => u.Hierarchy) 
             .Where(u => u.IsActive)
+            .AsNoTracking()
             .ToListAsync();
         }
 
