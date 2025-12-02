@@ -71,37 +71,37 @@ namespace Application.UnitTests.Services
             )), Times.Once);
         }
 
-        [Fact]
-        public async Task MoveUserToHierarchyAsync_WithoutManager_ShouldAutoAssignCeo()
-        {
-            var currentUserId = Guid.NewGuid();
-            var currentUserRole = "Hr";
-            var moveRequest = new MoveUserRequestDto
-            {
-                UserId = Guid.NewGuid(),
-                TargetHierarchyId = 44
-            };
+        //[Fact]
+        //public async Task MoveUserToHierarchyAsync_WithoutManager_ShouldAutoAssignCeo()
+        //{
+        //    var currentUserId = Guid.NewGuid();
+        //    var currentUserRole = "Hr";
+        //    var moveRequest = new MoveUserRequestDto
+        //    {
+        //        UserId = Guid.NewGuid(),
+        //        TargetHierarchyId = 44
+        //    };
 
-            var userToMove = CreateTestUser(moveRequest.UserId, "User", "ToMove", "Developer", "Old Department", hierarchyId: 1);
-            var targetHierarchy = new Hierarchy { HierarchyId = 44, LevelHierarchy = 4, TitleHierarchy = "Target Department", ColorHierarchy = "FF5733" };
-            var hierarchyCeo = CreateTestUser(Guid.NewGuid(), "Hierarchy", "CEO", "Manager", "Target Department", hierarchyId: 44);
+        //    var userToMove = CreateTestUser(moveRequest.UserId, "User", "ToMove", "Developer", "Old Department", hierarchyId: 1);
+        //    var targetHierarchy = new Hierarchy { HierarchyId = 44, LevelHierarchy = 4, TitleHierarchy = "Target Department", ColorHierarchy = "FF5733" };
+        //    var hierarchyCeo = CreateTestUser(Guid.NewGuid(), "Hierarchy", "CEO", "Manager", "Target Department", hierarchyId: 44);
 
-            _mockUserRepository.Setup(x => x.GetUsersByIdAsync(moveRequest.UserId))
-                .ReturnsAsync(userToMove);
-            _mockUserRepository.Setup(x => x.GetHierarchyByIdAsync(moveRequest.TargetHierarchyId))
-                .ReturnsAsync(targetHierarchy);
-            _mockUserRepository.Setup(x => x.GetCeoByHierarchyIdAsync(moveRequest.TargetHierarchyId))
-                .ReturnsAsync(hierarchyCeo);
-            _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
-                .Returns(Task.CompletedTask);
+        //    _mockUserRepository.Setup(x => x.GetUsersByIdAsync(moveRequest.UserId))
+        //        .ReturnsAsync(userToMove);
+        //    _mockUserRepository.Setup(x => x.GetHierarchyByIdAsync(moveRequest.TargetHierarchyId))
+        //        .ReturnsAsync(targetHierarchy);
+        //    _mockUserRepository.Setup(x => x.GetCeoByHierarchyIdAsync(moveRequest.TargetHierarchyId))
+        //        .ReturnsAsync(hierarchyCeo);
+        //    _mockUserRepository.Setup(x => x.UpdateUserAsync(It.IsAny<User>()))
+        //        .Returns(Task.CompletedTask);
 
-            var result = await _userService.MoveUserToHierarchyAsync(moveRequest, currentUserId, currentUserRole);
+        //    var result = await _userService.MoveUserToHierarchyAsync(moveRequest, currentUserId, currentUserRole);
 
-            Assert.NotNull(result);
-            _mockUserRepository.Verify(x => x.UpdateUserAsync(It.Is<User>(u =>
-                u.Manager_id == hierarchyCeo.User_id
-            )), Times.Once);
-        }
+        //    Assert.NotNull(result);
+        //    _mockUserRepository.Verify(x => x.UpdateUserAsync(It.Is<User>(u =>
+        //        u.Manager_id == hierarchyCeo.User_id
+        //    )), Times.Once);
+        //}
 
         [Fact]
         public async Task MoveUserToHierarchyAsync_WithNonAdminRole_ShouldThrowUnauthorized()

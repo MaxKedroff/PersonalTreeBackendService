@@ -535,6 +535,13 @@ namespace Application.Services
             userToMove.HierarchyId = targetHierarchy.HierarchyId;
             userToMove.Manager_id = actualManagerId;
             userToMove.Updated_at = DateTime.UtcNow;
+            if (actualManagerId.HasValue)
+            {
+                var manager = await _userRepository.GetUsersByIdAsync(actualManagerId.Value);
+                manager.Subordinates.Add(userToMove);
+                await _userRepository.UpdateUserAsync(manager);
+            }
+           
 
             if (userToMove.WorkInfo != null)
             {
