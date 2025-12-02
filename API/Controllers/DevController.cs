@@ -27,7 +27,6 @@ namespace API.Controllers
                     return Ok(new { message = $"Таблица уже заполнена: {userCount} пользователей." });
                 }
 
-                await _context.Database.ExecuteSqlRawAsync("SET session_replication_role = 'replica';");
 
                 await _context.Database.ExecuteSqlRawAsync(
                 "TRUNCATE TABLE users RESTART IDENTITY CASCADE;"
