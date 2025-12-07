@@ -778,5 +778,100 @@ namespace Application.Services
 
             _logger.LogInformation("Subordinate redistribution completed");
         }
+
+        public async Task<HierarchyNodeWithoutPersonsDto> GetDepartmentTreeAsync()
+        {
+            var hierarchies = await _userRepository.GetHierarchiesList();
+
+            var hierarchyDict = hierarchies.ToDictionary(h => h.HierarchyId, h => new HierarchyNodeWithoutPersonsDto
+            {
+                HierarchyId = h.HierarchyId,
+                Level = h.LevelHierarchy,
+                Title = h.TitleHierarchy,
+                Color = h.ColorHierarchy,
+                Children = new List<HierarchyNodeWithoutPersonsDto>()
+            });
+
+            var root = hierarchyDict.Values.FirstOrDefault(h => h.Level == 1);
+            if (root == null)
+            {
+                root = new HierarchyNodeWithoutPersonsDto { Level = 1, Title = "UDV GROUP", Color = "#000000" };
+                hierarchyDict[-1] = root;
+            }
+
+            foreach (var h in hierarchies.Where(h => h.ParentId.HasValue))
+            {
+                if (hierarchyDict.TryGetValue(h.ParentId.Value, out var parent) &&
+            hierarchyDict.TryGetValue(h.HierarchyId, out var child))
+                {
+                    parent.Children.Add(child);
+                }
+            }
+
+            
+            return root;
+        }
+
+        public async Task<DepartmentDetailsDto> GetDetailsFromDepartment(string hierarchyId)
+        {
+            if (!int.TryParse(hierarchyId, out var hierarchyIdInt))
+            {
+                throw new ArgumentException("Invalid hierarchy ID format", nameof(hierarchyId));
+            }
+
+            var hierarchies = await _userRepository.GetHierarchiesList();
+            var targetHierarchy = hierarchies.FirstOrDefault(h => h.HierarchyId == hierarchyIdInt);
+
+            if (targetHierarchy == null)
+            {
+                throw new KeyNotFoundException($"Hierarchy with ID {hierarchyId} not found");
+            }
+
+            var users = await _userRepository.GetUsersWithHierarchyV2Async();
+
+            var usersInDepartment = users
+                .Where(u => u.HierarchyId.HasValue && u.HierarchyId.Value == hierarchyIdInt)
+                .ToList();
+
+            EmployeeHierarchyDto? manager = null;
+            List<EmployeeFlatDto> employees = new List<EmployeeFlatDto>();
+
+            if (usersInDepartment.Any())
+            {
+                var ceo = usersInDepartment.FirstOrDefault(u =>
+                    !u.Manager_id.HasValue ||
+                    !usersInDepartment.Any(m => m.User_id == u.Manager_id));
+
+                if (ceo != null)
+                {
+                    manager = Mapper.MapEmployeeToHierarchyDto(ceo, usersInDepartment);
+
+                    employees = usersInDepartment
+                        .Where(u => u.User_id != ceo.User_id)
+                        .Select(u => Mapper.MapEmployeeToFlatDto(u))
+                        .ToList();
+                }
+                else
+                {
+                    var firstUser = usersInDepartment.First();
+                    manager = Mapper.MapEmployeeToHierarchyDto(firstUser, usersInDepartment);
+
+                    employees = usersInDepartment
+                        .Where(u => u.User_id != firstUser.User_id)
+                        .Select(u => Mapper.MapEmployeeToFlatDto(u))
+                        .ToList();
+                }
+            }
+
+            var result = new DepartmentDetailsDto
+            {
+                HierarchyId = hierarchyIdInt,
+                Title = targetHierarchy.TitleHierarchy,
+                Manager = manager,
+                Employees = employees
+            };
+
+            return result;
+        }
     }
 }

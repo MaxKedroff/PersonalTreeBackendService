@@ -236,6 +236,43 @@ namespace API.Controllers
             }
         }
 
+        [HttpGet("treeWithoutUsers")]
+        [Authorize(AuthOptions.POLICY_USER)]
+        [ProducesResponseType(typeof(HierarchyNodeDto), 200)]
+        public async Task<ActionResult<HierarchyNodeDto>> GetTreeHierarchy()
+        {
+            try
+            {
+                var hierarchy = await _userService.GetDepartmentTreeAsync();
+                return Ok(hierarchy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при построении иерархии");
+                return StatusCode(500, new { message = "Ошибка при построении иерархии" });
+            }
+        }
+
+        [HttpGet("departmentUsers")]
+        [Authorize(AuthOptions.POLICY_USER)]
+        [ProducesResponseType(typeof(DepartmentDetailsDto), 200)]
+        public async Task<ActionResult<DepartmentDetailsDto>> GetDepartmentUsers(
+    [FromQuery] string? hierarchyId = null)
+        {
+            try
+            {
+                var departmentDetails = await _userService.GetDetailsFromDepartment(hierarchyId);
+
+                return Ok(departmentDetails);
+            }
+            
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при получении пользователей отдела. HierarchyId: {HierarchyId}", hierarchyId);
+                return NotFound("контент не обнаружен");
+            }
+        }
+
         /// <summary>
         /// Обновляет профиль пользователя. Доступно только владельцу профиля или администратору.
         /// </summary>

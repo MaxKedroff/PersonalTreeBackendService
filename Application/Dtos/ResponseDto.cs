@@ -100,4 +100,23 @@ namespace Application.Dtos
         public EmployeeHierarchyDto? Manager { get; set; }
         public List<EmployeeFlatDto> Employees { get; set; } = new List<EmployeeFlatDto>();
     }
+
+    public class HierarchyNodeWithoutPersonsDto
+    {
+        public int HierarchyId { get; set; }
+        public int Level { get; set; }
+        public string Title { get; set; }
+        public string Color { get; set; }
+        public List<HierarchyNodeWithoutPersonsDto> Children { get; set; } = new List<HierarchyNodeWithoutPersonsDto>();
+    }
+
+    public class DepartmentDetailsDto
+    {
+        public int HierarchyId { get; set; }
+
+        public string Title { get; set; }
+
+        public EmployeeHierarchyDto? Manager { get; set; }
+        public List<EmployeeFlatDto> Employees { get; set; } = new List<EmployeeFlatDto>();
+    }
 }
