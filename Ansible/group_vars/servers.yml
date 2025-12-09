@@ -1,0 +1,15 @@
+admin_user: admin-tree
+domain_name: "{{ hostvars[inventory_hostname].domain_name | default('udv-team-map.ru') }}"
+backend_dir: "/home/{{ admin_user }}/PersonTree/Backend"
+frontend_dir: "/home/{{ admin_user }}/PersonTree/Frontend"
+
+backend_image: "maxkedroff2005/persontree-backend:latest"
+frontend_image: "maxkedroff2005/persontree-frontend:latest"
+
+backend_port: 8080
+frontend_port: 3000
+db_port: 5432
+prometheus_port: 9090
+grafana_port: 3001
+
+nginx_conf_path: "/etc/nginx/sites-available/{{ domain_name }}"

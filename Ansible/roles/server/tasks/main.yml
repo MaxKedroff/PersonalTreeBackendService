@@ -1,0 +1,326 @@
+---
+- name: Create admin user
+  user:
+    name: "{{ admin_user }}"
+    state: present
+    shell: /bin/bash
+    create_home: yes
+    groups: docker
+    append: yes
+    password: "{{'admin123' | password_hash('sha512')}}"
+
+- name: Create application directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0755"
+  loop:
+    - "{{ backend_dir }}"
+    - "{{ frontend_dir }}"
+    - "{{ backend_dir }}/grafana/dashboards"
+    - "{{ backend_dir}}/grafana/datasources"
+
+- name: Install required system packages
+  apt:
+    name:
+      - docker.io
+      - docker-compose
+      - nginx
+      - python3-pip
+      - ufw
+      - git
+      - curl
+      - wget
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+    state: present
+    update_cache: yes
+
+- name: Install Docker Compose Plugin
+  get_url:
+    url: https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-linux-x86_64
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+
+- name: Add user to docker group
+  user:
+    name: "{{ admin_user }}"
+    groups: docker
+    append: yes
+
+- name: Start and enable Docker service
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Copy backend docker-compose.yml
+  copy:
+    content: |
+      version: '3.8'
+
+      services:
+        db:
+          image: postgres:13
+          environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: persontree
+          volumes:
+            - postgres_data:/var/lib/postgresql/data
+          ports:
+            - "5432:5432"
+          networks:
+            - persontree-network
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d persontree"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+
+        app:
+          image: maxkedroff2005/persontree-backend:latest
+          environment:
+            ASPNETCORE_ENVIRONMENT: Production
+            ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=persontree;Username=postgres;Password=postgres"
+          ports:
+            - "8080:8080"
+          depends_on:
+            db:
+              condition: service_healthy
+          networks:
+            - persontree-network
+          labels:
+            - "prometheus.scrape=true"
+            - "prometheus.port=8080"
+            - "prometheus.path=/metrics"
+
+        prometheus:
+          image: prom/prometheus:latest
+          ports:
+            - "9090:9090"
+          volumes:
+            - ./prometheus.yml:/etc/prometheus/prometheus.yml
+            - prometheus_data:/prometheus
+          command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--storage.tsdb.retention.time=200h'
+            - '--web.enable-lifecycle'
+          networks:
+            - persontree-network
+          restart: unless-stopped
+
+        grafana:
+          image: grafana/grafana:latest
+          ports:
+            - "3001:3000"
+          environment:
+            - GF_SECURITY_ADMIN_PASSWORD=admin123
+          volumes:
+            - grafana_data:/var/lib/grafana
+            - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+            - ./grafana/datasources:/etc/grafana/provisioning/datasources
+          networks:
+            - persontree-network
+          restart: unless-stopped
+          depends_on:
+            - prometheus
+
+      volumes:
+        postgres_data:
+        prometheus_data:
+        grafana_data:
+
+      networks:
+        persontree-network:
+          driver: bridge
+    dest: "{{ backend_dir }}/docker-compose.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Copy prometheus.yml
+  copy:
+    content: |
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+        - job_name: 'aspnet-backend'
+          static_configs:
+            - targets: ['app:8080']
+          metrics_path: '/metrics'
+          scrape_interval: 10s
+
+    dest: "{{ backend_dir }}/prometheus.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Create Grafana datasources
+  copy:
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus:9090
+          isDefault: true
+    dest: "{{ backend_dir }}/grafana/datasources/prometheus.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Create Grafana dashboards
+  copy:
+    content: |
+      apiVersion: 1
+
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /etc/grafana/provisioning/dashboards
+    dest: "{{ backend_dir }}/grafana/dashboards/default.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Copy frontend docker-compose.yml.j2 as template
+  template:
+    src: "{{ role_path }}/templates/nginx-site.conf.j2"
+    dest: "{{ frontend_dir }}/docker-compose.yml"
+  when: false  
+
+- name: Create frontend docker-compose.yml manually
+  copy:
+    content: |
+      version: '3.8'
+
+      services:
+        frontend:
+          image: maxkedroff2005/persontree-frontend:latest
+          container_name: persontree-frontend
+          restart: unless-stopped
+          ports:
+            - "127.0.0.1:3000:80"
+          networks:
+            - backend_persontree-network
+
+      networks:
+        backend_persontree-network:
+          external: true
+    dest: "{{ frontend_dir }}/docker-compose.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Create external Docker network
+  community.docker.docker_network:
+    name: backend_persontree-network
+    state: present
+    driver: bridge
+
+- name: Start backend services
+  community.docker.docker_compose:
+    project_src: "{{ backend_dir }}"
+    state: present
+  become_user: "{{ admin_user }}"
+
+- name: Wait for backend to be ready
+  wait_for:
+    port: "{{ backend_port }}"
+    delay: 15
+    timeout: 180
+    state: started
+
+- name: Start frontend services
+  community.docker.docker_compose:
+    project_src: "{{ frontend_dir }}"
+    state: present
+  become_user: "{{ admin_user }}"
+
+- name: Wait for frontend to be ready
+  wait_for:
+    port: 3000
+    host: 127.0.0.1
+    delay: 10
+    timeout: 60
+    state: started
+
+- name: Deploy Nginx configuration
+  template:
+    src: nginx-site.conf.j2
+    dest: "{{ nginx_conf_path }}"
+  notify: Reload Nginx
+
+- name: Enable Nginx site
+  file:
+    src: "{{ nginx_conf_path }}"
+    dest: "/etc/nginx/sites-enabled/{{ domain_name }}"
+    state: link
+  notify: Reload Nginx
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  when: ansible_facts['os_family'] == "Debian"
+  notify: Reload Nginx
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Configure firewall
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "22"    
+    - "80"    
+    - "443"   
+    - "{{ backend_port }}"
+    - "{{ prometheus_port }}"
+    - "{{ grafana_port }}"
+    - "{{ db_port }}"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Display service status
+  shell: |
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    echo "=== Nginx Status ==="
+    systemctl status nginx --no-pager -l
+  register: service_status
+  changed_when: false
+
+- name: Show service status output
+  debug:
+    msg: "{{ service_status.stdout_lines }}"

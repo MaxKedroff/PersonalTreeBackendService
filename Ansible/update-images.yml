@@ -1,0 +1,67 @@
+﻿---
+- name: Update Docker images for PersonTree
+  hosts: servers
+  become: yes
+  
+  vars_files:
+    - group_vars/servers.yml
+  
+  tasks:
+    - name: Pull latest backend image
+      community.docker.docker_image:
+        name: "{{ backend_image }}"
+        source: pull
+      
+    - name: Pull latest frontend image
+      community.docker.docker_image:
+        name: "{{ frontend_image }}"
+        source: pull
+      
+    - name: Stop and remove old containers
+      community.docker.docker_compose:
+        project_src: "{{ backend_dir }}"
+        state: absent
+      become_user: "{{ admin_user }}"
+      
+    - name: Start backend with new images
+      community.docker.docker_compose:
+        project_src: "{{ backend_dir }}"
+        state: present
+        pull: yes
+        recreate: yes
+      become_user: "{{ admin_user }}"
+      
+    - name: Stop and remove old frontend containers
+      community.docker.docker_compose:
+        project_src: "{{ frontend_dir }}"
+        state: absent
+      become_user: "{{ admin_user }}"
+      
+    - name: Start frontend with new images
+      community.docker.docker_compose:
+        project_src: "{{ frontend_dir }}"
+        state: present
+        pull: yes
+        recreate: yes
+      become_user: "{{ admin_user }}"
+      
+    - name: Wait for services to be ready
+      wait_for:
+        port: "{{ item.port }}"
+        host: "{{ item.host | default('127.0.0.1') }}"
+        delay: 10
+        timeout: 120
+      loop:
+        - { port: "{{ backend_port }}" }
+        - { port: "3000", host: "127.0.0.1" }
+        
+    - name: Show updated containers
+      shell: docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+      register: containers
+      changed_when: false
+      
+    - name: Display update results
+      debug:
+        msg: 
+          - "Images updated successfully!"
+          - "{{ containers.stdout }}"

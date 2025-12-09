@@ -1,0 +1,38 @@
+﻿---
+- name: Deploy PersonTree Application Stack
+  hosts: servers
+  become: true
+  gather_facts: true
+  
+  vars_files:
+    - group_vars/servers.yml
+  
+  pre_tasks:
+    - name: Check Ubuntu version
+      fail:
+        msg: "This playbook requires Ubuntu 20.04 or later"
+      when: ansible_distribution != "Ubuntu" or ansible_distribution_version < "20.04"
+      
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: always
+
+  roles:
+    - role: server
+  
+  post_tasks:
+    - name: Display deployment summary
+      debug:
+        msg:
+          - "Deployment completed successfully!"
+          - "Frontend: http://{{ domain_name }}"
+          - "Backend API: http://{{ domain_name }}/api/"
+          - "Prometheus: http://{{ domain_name }}/prometheus/ (restricted)"
+          - "Grafana: http://{{ domain_name }}/grafana/ (restricted)"
+          - "Direct backend: http://{{ domain_name }}:{{ backend_port }}"
+          - "Direct Grafana: http://{{ domain_name }}:{{ grafana_port }}"
+          - "Backend directory: {{ backend_dir }}"
+          - "Frontend directory: {{ frontend_dir }}"
+      tags: always
