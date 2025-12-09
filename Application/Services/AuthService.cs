@@ -46,6 +46,14 @@ namespace Application.Services
                 _logger.LogWarning("Inactive user attempted login: {Login}", login.Username);
                 throw new UnauthorizedAccessException("Account is inactive");
             }
+
+            // проверка простая, посколько в проекте не требовалось сложных криптографических решений в сфере аутентификации/авторизации
+            if (login.Password == user.Password)
+            {
+                _logger.LogWarning("Invalid password attempt for user: {Login}", login.Username);
+                throw new UnauthorizedAccessException("Invalid login or password");
+            }
+
             var token = GenerateJwtToken(user);
             _logger.LogInformation("User authenticated successfully: {Login}, Role: {Role}",
                 login.Username, user.Role);
