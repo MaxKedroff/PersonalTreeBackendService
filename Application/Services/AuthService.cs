@@ -48,7 +48,7 @@ namespace Application.Services
             }
 
             // проверка простая, посколько в проекте не требовалось сложных криптографических решений в сфере аутентификации/авторизации
-            if (login.Password == user.Password)
+            if (login.Password != user.Password)
             {
                 _logger.LogWarning("Invalid password attempt for user: {Login}", login.Username);
                 throw new UnauthorizedAccessException("Invalid login or password");
