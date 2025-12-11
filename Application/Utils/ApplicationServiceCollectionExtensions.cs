@@ -20,14 +20,19 @@ namespace Application.Utils
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // Database
             services.AddDbContext<UserDb>(options =>
-                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"))); 
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorCodesToAdd: null);
+                }));
 
-            // Repositories
             services.AddScoped<IUserRepository, UserRepository>();
 
-            // Services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ILdapService, LdapService>();
             services.AddScoped<IAuthService, AuthService>();
