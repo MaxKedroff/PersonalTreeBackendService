@@ -69,7 +69,9 @@ namespace Application.Utils
                 City = user.ContactInfo?.City,
                 Interests = user.PersonalInfo?.Interests,
                 avatar = user.ContactInfo?.Avatar,
-                Contacts = user.Contacts ?? new JObject()
+                Contacts = user.Contacts ?? new JObject(),
+                manager_id = user.Manager_id,
+                hierarchyId = user.HierarchyId
             };
         }
 

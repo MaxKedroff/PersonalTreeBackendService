@@ -52,6 +52,9 @@ namespace Application.Dtos
         public string avatar { get; set; }
 
         public JObject Contacts { get; set; } = new JObject();
+
+        public Guid? manager_id { get; set; }
+        public int? hierarchyId { get; set; }
     }
 
     public class SearchResponseDto
