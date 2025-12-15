@@ -492,7 +492,14 @@ namespace Application.Services
                     _logger.LogWarning("Cannot move user to non-leaf hierarchy level: {Level}", targetHierarchy.LevelHierarchy);
                     throw new InvalidOperationException("Can only move users to leaf hierarchies (levels 4-5)");
                 }
+                var targetHierarchyCeo = await _userRepository.GetCeoByHierarchyIdAsync(targetHierarchy.HierarchyId);
 
+                if (targetHierarchyCeo == null && !moveRequest.NewManagerId.HasValue)
+                {
+                    _logger.LogInformation("Target hierarchy is empty - automatically making user {UserId} CEO",
+                        userToMove.User_id);
+                    await HandleBecomeCeoInEmptyHierarchy(userToMove, targetHierarchy);
+                }
                 if (moveRequest.BecomeCeo)
                 {
                     if (userToMove.HierarchyId != targetHierarchy.HierarchyId)
@@ -522,6 +529,71 @@ namespace Application.Services
                     moveRequest.UserId, moveRequest.TargetHierarchyId);
                 throw;
             }
+        }
+
+        private async Task HandleBecomeCeoInEmptyHierarchy(User userToMove, Hierarchy targetHierarchy)
+        {
+            _logger.LogInformation("Handling Become CEO in empty hierarchy - User: {UserId}, TargetHierarchy: {HierarchyId}",
+                userToMove.User_id, targetHierarchy.HierarchyId);
+
+            // Сохраняем старые значения для обработки подчиненных
+            var oldHierarchyId = userToMove.HierarchyId;
+            var oldManagerId = userToMove.Manager_id;
+            var oldSubordinates = userToMove.Subordinates?.ToList() ?? new List<User>();
+
+            // Перемещаем пользователя в новый отдел
+            userToMove.HierarchyId = targetHierarchy.HierarchyId;
+            userToMove.Manager_id = null; // Он становится CEO
+            userToMove.Updated_at = DateTime.UtcNow;
+
+            if (userToMove.WorkInfo != null)
+            {
+                userToMove.WorkInfo.Department = targetHierarchy.TitleHierarchy;
+            }
+
+            if (oldSubordinates.Any())
+            {
+                var oldCeo = await _userRepository.GetCeoByHierarchyIdAsync(oldHierarchyId.Value);
+
+                if (oldCeo != null && oldCeo.User_id != userToMove.User_id)
+                {
+                    foreach (var subordinate in oldSubordinates)
+                    {
+                        subordinate.Manager_id = oldCeo.User_id;
+                        subordinate.Updated_at = DateTime.UtcNow;
+                        await _userRepository.UpdateUserAsync(subordinate);
+                        _logger.LogDebug("Reassigned subordinate {SubordinateId} to old CEO {OldCeoId}",
+                            subordinate.User_id, oldCeo.User_id);
+                    }
+                }
+                else if (oldManagerId.HasValue)
+                {
+                    foreach (var subordinate in oldSubordinates)
+                    {
+                        subordinate.Manager_id = oldManagerId.Value;
+                        subordinate.Updated_at = DateTime.UtcNow;
+                        await _userRepository.UpdateUserAsync(subordinate);
+                        _logger.LogDebug("Reassigned subordinate {SubordinateId} to old manager {ManagerId}",
+                            subordinate.User_id, oldManagerId.Value);
+                    }
+                }
+                else
+                {
+                    foreach (var subordinate in oldSubordinates)
+                    {
+                        subordinate.Manager_id = null;
+                        subordinate.Updated_at = DateTime.UtcNow;
+                        await _userRepository.UpdateUserAsync(subordinate);
+                        _logger.LogDebug("Made subordinate {SubordinateId} CEO of their department",
+                            subordinate.User_id);
+                    }
+                }
+            }
+
+            await _userRepository.UpdateUserAsync(userToMove);
+
+            _logger.LogInformation("User {UserId} became CEO in empty hierarchy {HierarchyId}",
+                userToMove.User_id, targetHierarchy.HierarchyId);
         }
 
         private async Task HandleRegularMoveScenario(User userToMove, Guid? newManagerId, Hierarchy targetHierarchy)
