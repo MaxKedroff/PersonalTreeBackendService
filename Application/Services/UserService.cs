@@ -6,10 +6,12 @@ using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Application.Services
@@ -367,14 +369,9 @@ namespace Application.Services
 
                 if (updateDto.Contacts != null && updateDto.Contacts.Any())
                 {
-                    foreach (var contact in updateDto.Contacts)
-                    {
-                        if (!string.IsNullOrWhiteSpace(contact.Key))
-                        {
-                            user.SetContact(contact.Key, contact.Value);
-                            _logger.LogDebug("Updated contact {ContactKey} for user {UserId}", contact.Key, userId);
-                        }
-                    }
+                    user.UpdateContacts(updateDto.Contacts);
+                    _logger.LogDebug("Updated contacts for user {UserId}: {Contacts}",
+                        userId, JsonSerializer.Serialize(updateDto.Contacts));
                 }
 
                 user.Updated_at = DateTime.UtcNow;
