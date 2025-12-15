@@ -227,10 +227,16 @@ namespace Application.Services
                     PageSize = pageSize
                 };
 
-                var colorTasks = response.UsersTable.Select(async user =>
+                foreach (var user in response.UsersTable)
                 {
                     try
                     {
+                        if (string.IsNullOrEmpty(user.Department))
+                        {
+                            user.hierarchyColor = null;
+                            continue;
+                        }
+
                         _logger.LogDebug("Getting color for department: {Department}", user.Department);
                         var color = await _userRepository.GetColorByTitleHierarchy(user.Department);
                         _logger.LogDebug("Color result: {Color} for department: {Department}",
@@ -241,11 +247,9 @@ namespace Application.Services
                     {
                         _logger.LogError(ex, "Error getting color for department: {Department}",
                             user.Department);
-                        user.hierarchyColor = null; 
+                        user.hierarchyColor = null;
                     }
-                });
-
-                await Task.WhenAll(colorTasks);
+                }
 
                 if (request.isCached != false)
                 {
