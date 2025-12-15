@@ -216,7 +216,7 @@ namespace Application.Services
 
                 var pageSize = request.Limit > 0 ? request.Limit : 10;
                 var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-
+                
                 var response = new ResponseTableUsersDto
                 {
                     AmountOfUsers = totalCount,
@@ -226,6 +226,8 @@ namespace Application.Services
                     TotalPages = totalPages,
                     PageSize = pageSize
                 };
+
+                response.UsersTable.Select(async user => user.hierarchyColor = await _userRepository.GetColorByTitleHierarchy(user.Department));
 
                 if (request.isCached != false)
                 {

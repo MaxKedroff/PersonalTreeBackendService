@@ -19,6 +19,9 @@ namespace Domain.Interfaces
         Task<List<User>> GetSearchResultAsync(string criteria, string searchString, int queryAmount);
         Task<List<User>> GetUsersWithHierarchyAsync();
         Task<List<User>> GetUsersWithHierarchyV2Async();
+
+        Task<string> GetColorByTitleHierarchy(string title);
+
         Task<User> GetCeoAsync();
         Task<User> GetUserByLoginAsync(string login);
         Task UpdateUserAsync(User user);

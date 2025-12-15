@@ -16,6 +16,7 @@ namespace Application.Dtos
         public int CurrentPage { get; set; }
         public int TotalPages { get; set; }
         public int PageSize { get; set; }
+
     }
 
     public class TableUserDto
@@ -24,6 +25,7 @@ namespace Application.Dtos
         public string? Position { get; set; }
         public string? Department { get; set; }
         public Guid UserId { get; set; }
+        public string? hierarchyColor { get; set; }
     }
 
 

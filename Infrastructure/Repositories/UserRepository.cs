@@ -101,6 +101,15 @@ namespace Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<string> GetColorByTitleHierarchy(string title)
+        {
+            var hierarchy = await _context.Hierarchies.FirstOrDefaultAsync(el => el.TitleHierarchy == title);
+            if (hierarchy == null)
+                return null;
+
+            return hierarchy.ColorHierarchy;
+        }
+
         public async Task<User> GetCeoAsync()
         {
             return await _context.Users
