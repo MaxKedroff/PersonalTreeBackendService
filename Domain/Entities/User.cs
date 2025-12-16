@@ -31,7 +31,7 @@ namespace Domain.Entities
         [Column(TypeName = "jsonb")]
         public JObject Contacts { get; set; } = new JObject();
 
-        public string[] Skills { get; set; } = Array.Empty<string>();
+        public string[]? Skills { get; set; } = Array.Empty<string>();
 
         public string SamAccountName { get; set; } 
         public string Email { get; set; }
