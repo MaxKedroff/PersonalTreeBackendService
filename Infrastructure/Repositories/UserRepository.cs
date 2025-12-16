@@ -93,7 +93,17 @@ namespace Infrastructure.Repositories
         public async Task AddSkillToUser(Guid userId, string skill)
         {
             var user = await GetUsersByIdAsync(userId);
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID {userId} not found");
+
+            user.Skills ??= Array.Empty<string>();
+
+            if (user.Skills.Any(s =>
+                string.Equals(s, skill, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"Skill '{skill}' already exists");
+
             user.Skills = user.Skills.Append(skill).ToArray();
+
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
@@ -101,11 +111,19 @@ namespace Infrastructure.Repositories
         public async Task DeleteSkillFromUser(Guid userId, string skill)
         {
             var user = await GetUsersByIdAsync(userId);
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID {userId} not found");
 
-            var skills = user.Skills;
-            if (!skills.Contains(skill))
-                throw new Exception("skill not found");
-            user.Skills = user.Skills.Where(s => s != skill).ToArray();
+            user.Skills ??= Array.Empty<string>();
+
+            if (!user.Skills.Any(s =>
+                string.Equals(s, skill, StringComparison.OrdinalIgnoreCase)))
+                throw new KeyNotFoundException($"Skill '{skill}' not found for user");
+
+            user.Skills = user.Skills
+                .Where(s => !string.Equals(s, skill, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
