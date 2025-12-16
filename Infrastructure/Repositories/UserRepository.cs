@@ -87,13 +87,13 @@ namespace Infrastructure.Repositories
         public async Task<List<string>> GetSkillsByUser(Guid UserId)
         {
             var user = await GetUsersByIdAsync(UserId);
-            return user.Skills;
+            return user.Skills.ToList();
         }
 
         public async Task AddSkillToUser(Guid userId, string skill)
         {
             var user = await GetUsersByIdAsync(userId);
-            user.Skills.Add(skill);
+            user.Skills = user.Skills.Append(skill).ToArray();
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
@@ -105,7 +105,7 @@ namespace Infrastructure.Repositories
             var skills = user.Skills;
             if (!skills.Contains(skill))
                 throw new Exception("skill not found");
-            user.Skills.Remove(skill);
+            user.Skills = user.Skills.Where(s => s != skill).ToArray();
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
         }
