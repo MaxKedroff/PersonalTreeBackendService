@@ -31,5 +31,10 @@ namespace Domain.Interfaces
         Task<Hierarchy> GetHierarchyByIdAsync(int hierarchyId);
         Task<User> GetCeoByHierarchyIdAsync(int hierarchyId);
 
+        Task DeleteSkillFromUser(Guid userId, string skill);
+        Task AddSkillToUser(Guid userId, string skill);
+
+        Task<List<string>> GetSkillsByUser(Guid UserId);
+
     }
 }

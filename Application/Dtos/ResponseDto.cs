@@ -71,6 +71,12 @@ namespace Application.Dtos
         public string position;
     }
 
+    public class SkillListDto
+    {
+        public List<string> skills;
+        public int count;
+    }
+
 
     public class DepartmentHierarchyDto
     {
