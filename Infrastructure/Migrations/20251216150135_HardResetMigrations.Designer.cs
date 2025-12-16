@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(UserDb))]
-    [Migration("20251216144938_FixSkillsToSimpleArray")]
-    partial class FixSkillsToSimpleArray
+    [Migration("20251216150135_HardResetMigrations")]
+    partial class HardResetMigrations
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
