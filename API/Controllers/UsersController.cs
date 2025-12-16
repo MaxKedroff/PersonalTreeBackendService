@@ -24,9 +24,10 @@ namespace API.Controllers
         private readonly ILogger<UsersController> _logger;
 
 
-        public UsersController(IUserService userService, ILogger<UsersController> logger)
+        public UsersController(IUserService userService, ILogger<UsersController> logger, ISkillService skillService)
         {
             _userService = userService;
+            _skillService = skillService;
             _logger = logger;
         }
 
