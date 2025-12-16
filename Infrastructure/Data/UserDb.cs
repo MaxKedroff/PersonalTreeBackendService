@@ -124,7 +124,14 @@ namespace Infrastructure.Data
                         v => JObject.Parse(v)
                     );
 
-                
+                entity.Property(e => e.Skills)
+                    .HasColumnType("text[]") 
+                    .HasConversion(
+                        v => v == null || v.Count == 0 ? null : v.ToArray(), 
+                        v => v == null ? new List<string>() : v.ToList() 
+                    );
+
+
             });
             base.OnModelCreating(modelBuilder);
         }
