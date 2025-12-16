@@ -71,7 +71,8 @@ namespace Application.Utils
                 avatar = user.ContactInfo?.Avatar,
                 Contacts = user.Contacts ?? new JObject(),
                 manager_id = user.Manager_id,
-                hierarchyId = user.HierarchyId
+                hierarchyId = user.HierarchyId,
+                Skills = user.Skills?.ToList()
             };
         }
 

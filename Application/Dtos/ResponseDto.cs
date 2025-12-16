@@ -55,6 +55,8 @@ namespace Application.Dtos
 
         public Guid? manager_id { get; set; }
         public int? hierarchyId { get; set; }
+
+        public List<string>? Skills { get; set; }
     }
 
     public class SearchResponseDto

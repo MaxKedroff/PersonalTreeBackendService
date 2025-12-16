@@ -393,6 +393,7 @@ namespace API.Controllers
             }
         }
 
+        [Obsolete("данные передаются напрямую юзеру, решили отказаться от метода")]
         [HttpGet("{user_id}/skills")]
         public async Task<ActionResult<SkillListDto>> GetUserSkills(Guid user_id)
         {
