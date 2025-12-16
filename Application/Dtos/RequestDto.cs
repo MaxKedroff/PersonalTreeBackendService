@@ -62,6 +62,13 @@ namespace Application.Dtos
         public string? Department { get; set; }
     }
 
+    public class RemoveAddSkillDto
+    {
+        public string skill;
+        public Guid userId;
+    }
+    
+
     public class MoveUserRequestDto
     {
         [Required]

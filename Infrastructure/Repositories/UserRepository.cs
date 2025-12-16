@@ -84,6 +84,32 @@ namespace Infrastructure.Repositories
             .FirstOrDefaultAsync(u => u.User_id == UserId);
         }
 
+        public async Task<List<string>> GetSkillsByUser(Guid UserId)
+        {
+            var user = await GetUsersByIdAsync(UserId);
+            return user.Skills;
+        }
+
+        public async Task AddSkillToUser(Guid userId, string skill)
+        {
+            var user = await GetUsersByIdAsync(userId);
+            user.Skills.Add(skill);
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteSkillFromUser(Guid userId, string skill)
+        {
+            var user = await GetUsersByIdAsync(userId);
+
+            var skills = user.Skills;
+            if (!skills.Contains(skill))
+                throw new Exception("skill not found");
+            user.Skills.Remove(skill);
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+        }
+
         [Obsolete("Use new version of hierarchy, this is old and will not update later")]
         public async Task<List<User>> GetUsersWithHierarchyAsync()
         {

@@ -124,12 +124,7 @@ namespace Infrastructure.Data
                         v => JObject.Parse(v)
                     );
 
-                entity.Property(e => e.Skills)
-                    .HasColumnType("jsonb")
-                    .HasConversion(
-                        v => v.ToString(Formatting.None),
-                        v => JObject.Parse(v)
-                    );
+                
             });
             base.OnModelCreating(modelBuilder);
         }

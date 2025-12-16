@@ -20,6 +20,7 @@ namespace API.Controllers
     {
 
         IUserService _userService;
+        ISkillService _skillService;
         private readonly ILogger<UsersController> _logger;
 
 
@@ -265,7 +266,7 @@ namespace API.Controllers
 
                 return Ok(departmentDetails);
             }
-            
+
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Ошибка при получении пользователей отдела. HierarchyId: {HierarchyId}", hierarchyId);
@@ -391,6 +392,41 @@ namespace API.Controllers
                 return StatusCode(500, new { message = "An error occurred while moving user" });
             }
         }
+
+        [HttpGet("{user_id}/skills")]
+        public async Task<ActionResult<SkillListDto>> GetUserSkills(Guid user_id)
+        {
+            return Ok(await _skillService.GetSkillListAsync(user_id));
+        }
+
+        [HttpPost("{user_id}/skills")]
+        public async Task<ActionResult> AdddNewSkill(Guid user_id, [FromQuery] string title)
+        {
+            var dto = new RemoveAddSkillDto
+            {
+                userId = user_id,
+                skill = title
+            };
+
+            await _skillService.AddSkillAsync(dto);
+            return Ok(new { message = "Skill added successfully" });
+        }
+
+        [HttpDelete("{user_id}/skills")]
+        public async Task<ActionResult> DeleteSkill(Guid user_id, [FromQuery] string title)
+        {
+            var dto = new RemoveAddSkillDto
+            {
+                userId = user_id,
+                skill = title
+            };
+
+            await _skillService.RemoveSkillAsync(dto);
+            return Ok(new { message = "Skill Removed successfully" });
+        }
+
+
+
 
         /// <summary>
         /// Извлекает идентификатор текущего пользователя из JWT-токена.
