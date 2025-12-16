@@ -17,6 +17,7 @@ namespace Application.UnitTests.Controllers
     public class UsersControllerTests
     {
         private readonly Mock<IUserService> _mockUserService;
+        private readonly Mock<ISkillService> _mockSkillsService;
         private readonly Mock<ILogger<UsersController>> _mockLogger;
         private readonly UsersController _controller;
         private readonly TableRequestDtoValidator _validator;
@@ -25,9 +26,10 @@ namespace Application.UnitTests.Controllers
         public UsersControllerTests()
         {
             _mockUserService = new Mock<IUserService>();
+            _mockSkillsService = new Mock<ISkillService>();
             _mockLogger = new Mock<ILogger<UsersController>>();
             _validator = new TableRequestDtoValidator();
-            _controller = new UsersController(_mockUserService.Object, _mockLogger.Object);
+            _controller = new UsersController(_mockUserService.Object, _mockLogger.Object, _mockSkillsService.Object);
         }
 
         [Fact]
