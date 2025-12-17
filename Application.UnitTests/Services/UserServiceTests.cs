@@ -44,11 +44,18 @@ namespace Application.UnitTests.Services
             };
 
             var users = new List<User>
-            {
-                CreateTestUser(Guid.NewGuid(), "John", "Doe", "Developer", "IT")
-            };
+    {
+        CreateTestUser(Guid.NewGuid(), "John", "Doe", "Developer", "IT")
+    };
 
-            _mockUserRepository.Setup(x => x.GetUsersPagedAsync(1, 10, "username", "asc", null, null, null))
+            _mockUserRepository.Setup(x => x.GetUsersPagedAsync(
+                    It.IsAny<int>(),
+                    It.IsAny<int>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<List<string>>(),
+                    It.IsAny<List<string>>(),
+                    It.IsAny<string>()))
                 .ReturnsAsync((users, 1));
 
             var result = await _userService.GetUserTableAsync(request);

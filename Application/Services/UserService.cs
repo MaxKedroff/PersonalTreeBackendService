@@ -1,6 +1,7 @@
 ﻿using Application.Dtos;
 using Application.Interfaces;
 using Application.Utils;
+using Core;
 using Domain.Entities;
 using Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -165,7 +166,8 @@ namespace Application.Services
         public async Task<ResponseTableUsersDto> GetUserTableAsync(TableRequestDto request)
         {
             var cacheKey = $"user_table_{request.page}_{request.Limit}_{request.Sort}_{request.PositionFilter}_{request.DepartmentFilter}_{request.SearchText}";
-
+            var positionFilters = Tools.ParseMultiFilter(request.PositionFilter);
+            var departmentFilters = Tools.ParseMultiFilter(request.DepartmentFilter);
             _logger.LogInformation("Getting users table - Page: {Page}, Limit: {Limit}, " +
                                 "PositionFilter: '{PositionFilter}', DepartmentFilter: '{DepartmentFilter}', " +
                                 "SearchText: '{SearchText}', Sort: '{Sort}', IsCached: {IsCached}",
@@ -208,8 +210,8 @@ namespace Application.Services
                     pageSize: request.Limit,
                     sortBy: sortParams.Field,
                     sortOrder: sortParams.Order,
-                    positionFilter: request.PositionFilter,
-                    departmentFilter: request.DepartmentFilter,
+                    positionFilters: positionFilters,
+                    departmentFilters: departmentFilters,
                     searchText: request.SearchText
                 );
 

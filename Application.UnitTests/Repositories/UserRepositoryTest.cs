@@ -91,7 +91,7 @@ namespace Application.UnitTests.Repositories
         [Fact]
         public async Task GetUsersPagedAsync_WithFilters_ReturnsFilteredResults()
         {
-            var result = await _repository.GetUsersPagedAsync(1, 10, null, "asc", "Developer", "IT");
+            var result = await _repository.GetUsersPagedAsync(1, 10, null, "asc", new List<string> { "Developer" }, new List<string> { "IT" });
             Assert.NotNull(result.Users);
             Assert.All(result.Users, user =>
             {

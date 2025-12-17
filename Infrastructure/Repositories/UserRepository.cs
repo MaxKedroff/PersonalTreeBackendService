@@ -171,7 +171,7 @@ namespace Infrastructure.Repositories
 
         public async Task<(List<User> Users, int TotalCount)> GetUsersPagedAsync(
             int page, int pageSize, string sortBy = null, string sortOrder = "asc",
-            string positionFilter = null, string departmentFilter = null, string searchText = null)
+            List<string> positionFilters = null, List<string> departmentFilters = null, string searchText = null)
         {
             var users = await GetUsersAsync();
 
@@ -189,12 +189,10 @@ namespace Infrastructure.Repositories
                                  $"Department: {sampleUser.WorkInfo?.Department}");
             }
 
-            // Фильтрация по отдельным полям
             var filteredUsers = users.AsQueryable();
 
             Console.WriteLine($"Before filtering: {filteredUsers.Count()} users");
 
-            // Текстовый поиск по всем полям
             if (!string.IsNullOrEmpty(searchText))
             {
                 Console.WriteLine($"Applying search text: '{searchText}'");
@@ -217,23 +215,29 @@ namespace Infrastructure.Repositories
                 Console.WriteLine($"After search text filter: {filteredUsers.Count()} users");
             }
 
-            if (!string.IsNullOrEmpty(positionFilter))
+            if (positionFilters != null && positionFilters.Any())
             {
-                Console.WriteLine($"Applying position filter: '{positionFilter}'");
+                Console.WriteLine($"Applying position filter: '{string.Join(", ", positionFilters)}'");
                 filteredUsers = filteredUsers.Where(u =>
                     u.WorkInfo != null &&
                     u.WorkInfo.Position != null &&
-                    u.WorkInfo.Position.Contains(positionFilter, StringComparison.OrdinalIgnoreCase));
+                    positionFilters.Any(position =>
+                        u.WorkInfo.Position.Contains(position, StringComparison.OrdinalIgnoreCase)
+                    )
+                );
                 Console.WriteLine($"After position filter: {filteredUsers.Count()} users");
             }
 
-            if (!string.IsNullOrEmpty(departmentFilter))
+            if (departmentFilters != null && departmentFilters.Any())
             {
-                Console.WriteLine($"Applying department filter: '{departmentFilter}'");
+                Console.WriteLine($"Applying department filter: '{string.Join(", ", departmentFilters)}'");
                 filteredUsers = filteredUsers.Where(u =>
                     u.WorkInfo != null &&
                     u.WorkInfo.Department != null &&
-                    u.WorkInfo.Department.Contains(departmentFilter, StringComparison.OrdinalIgnoreCase));
+                    departmentFilters.Any(department =>
+                        u.WorkInfo.Department.Contains(department, StringComparison.OrdinalIgnoreCase)
+                    )
+                );
                 Console.WriteLine($"After department filter: {filteredUsers.Count()} users");
             }
 
