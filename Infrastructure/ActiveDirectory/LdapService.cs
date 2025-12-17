@@ -41,7 +41,8 @@ namespace Infrastructure.ActiveDirectory
             var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
             var username = _configuration["Ldap:Username"] ?? "";
             var password = _configuration["Ldap:Password"] ?? "";
-
+            _logger.LogInformation("LDAP Username: {Username}, Password length: {Length}, password: {Password}",
+    username, password?.Length ?? 0, password);
             try
             {
                 _logger.LogInformation("Подключение к LDAP-серверу: {Server}:{Port} под пользователем {Username}", server, port, username);
