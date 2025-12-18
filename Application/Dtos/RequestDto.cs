@@ -96,9 +96,9 @@ namespace Application.Dtos
 
     public class SynchroRequestDto
     {
-        public int Count { get; set; }
-        public bool IsHardSynchronize { get; set; }
-        public List<UserToSynchronizeDto> Users { get; set; } = new List<UserToSynchronizeDto>();
+        public int count { get; set; }
+        public bool isHardSynchronize { get; set; }
+        public List<UserToSynchronizeDto> users { get; set; } = new List<UserToSynchronizeDto>();
     }
 
     public class UserToSynchronizeDto
