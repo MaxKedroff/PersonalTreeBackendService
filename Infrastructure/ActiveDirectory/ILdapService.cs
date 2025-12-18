@@ -12,5 +12,8 @@ namespace Infrastructure.ActiveDirectory
         Task<User> GetUserBySamAccountNameAsync(string samAccountName);
         Task<List<User>> GetUsersFromActiveDirectoryAsync();
         Task<LdapHierarchyResponse> GetLdapHierarchyAsync();
+        Task<bool> TestConnectionAsync();
+        Task<bool> TestCredentialsAsync(string username, string password);
+
     }
 }

@@ -1,18 +1,23 @@
 ﻿using Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Novell.Directory.Ldap;
-using System;
+using System.DirectoryServices.Protocols;
+using System.Net;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Infrastructure.ActiveDirectory
 {
-    public class LdapService : ILdapService
+    public class LdapService : ILdapService, IDisposable
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<LdapService> _logger;
+        private LdapConnection _connection;
+        private bool _isInitialized = false;
+        private readonly object _lock = new object();
+        private bool _disposed = false;
 
         public LdapService(IConfiguration configuration, ILogger<LdapService> logger)
         {
@@ -20,156 +25,260 @@ namespace Infrastructure.ActiveDirectory
             _logger = logger;
         }
 
-        private LdapConnection GetConnection()
+        private async Task<LdapConnection> GetConnectionAsync()
         {
-            try
+            // Используем двойную проверку для потокобезопасности
+            if (_connection != null && _isInitialized)
             {
-                var connection = new LdapConnection();
-                _logger.LogDebug("Создано новое LDAP-соединение (LdapConnection)");
-                return connection;
+                return _connection;
             }
-            catch (Exception ex)
+
+            lock (_lock)
             {
-                _logger.LogError(ex, "Не удалось создать LDAP-соединение");
-                throw;
+                if (_connection != null && _isInitialized)
+                {
+                    return _connection;
+                }
+
+                try
+                {
+                    // Закрываем старое соединение если есть
+                    if (_connection != null)
+                    {
+                        _connection.Dispose();
+                    }
+
+                    var server = _configuration["Ldap:Server"] ?? "10.51.4.18";
+                    var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
+                    var username = _configuration["Ldap:Username"] ?? "STUD\\Administrator";
+                    var password = _configuration["Ldap:Password"] ?? "hf8-5Bu3YMy):{uP;x";
+
+                    _logger.LogInformation(
+                        "Создание LDAP подключения к {Server}:{Port} как {Username}",
+                        server, port, username);
+
+                    // Создаем идентификатор сервера
+                    var identifier = new LdapDirectoryIdentifier(server, port);
+
+                    // Создаем соединение
+                    _connection = new LdapConnection(identifier)
+                    {
+                        Timeout = TimeSpan.FromSeconds(30),
+                        AutoBind = false
+                    };
+
+                    // Настраиваем параметры сессии
+                    _connection.SessionOptions.ProtocolVersion = 3;
+                    _connection.SessionOptions.SecureSocketLayer = false;
+
+                    // Отключаем проверку сертификатов если используем LDAPS
+                    _connection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
+
+                    // Настраиваем кэширование
+                    _connection.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
+                    _connection.SessionOptions.ReferralHopLimit = 1;
+
+                    // Создаем учетные данные
+                    var credentials = new NetworkCredential(username, password);
+
+                    // Подключаемся и аутентифицируемся
+                    _connection.Bind(credentials);
+
+                    _isInitialized = true;
+                    _logger.LogInformation("LDAP подключение успешно установлено");
+
+                    return _connection;
+                }
+                catch (LdapException ex)
+                {
+                    _logger.LogError(ex, "Ошибка LDAP при создании подключения. Код ошибки: {ErrorCode}", ex.ErrorCode);
+                    _connection?.Dispose();
+                    _connection = null;
+                    _isInitialized = false;
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Неизвестная ошибка при создании LDAP подключения");
+                    _connection?.Dispose();
+                    _connection = null;
+                    _isInitialized = false;
+                    throw;
+                }
             }
         }
 
-        private void ConnectAndBind(LdapConnection connection)
+        private async Task<bool> IsConnectionAliveAsync()
         {
-            var server = _configuration["Ldap:Server"] ?? "stud.local";
-            var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
-            var username = _configuration["Ldap:Username"] ?? "";
-            var password = _configuration["Ldap:Password"] ?? "";
-            _logger.LogInformation("LDAP Username: {Username}, Password length: {Length}, password: {Password}",
-    username, password?.Length ?? 0, password);
+            if (_connection == null || !_isInitialized)
+                return false;
+
             try
             {
-                _logger.LogInformation("Подключение к LDAP-серверу: {Server}:{Port} под пользователем {Username}", server, port, username);
-                connection.Connect(server, port);
-                connection.Bind(LdapConnection.Ldap_V3, username, password);
-                _logger.LogInformation("Успешно подключено и авторизовано в LDAP");
+                // Пробуем выполнить простой запрос чтобы проверить соединение
+                var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
+                var request = new SearchRequest(
+                    searchBase,
+                    "(objectClass=*)",
+                    SearchScope.Base,
+                    "1.1" // Только для проверки, не возвращаем атрибуты
+                );
+
+                request.Controls.Add(new DirectoryControl("1.2.840.113556.1.4.1781", null, false, true));
+
+                var response = (SearchResponse)_connection.SendRequest(request, TimeSpan.FromSeconds(5));
+                return true;
             }
-            catch (LdapException ldapEx)
+            catch
             {
-                _logger.LogError(ldapEx, "Ошибка LDAP при подключении или авторизации. Код: {ResultCode}, Сообщение: {Message}", ldapEx.ResultCode, ldapEx.Message);
-                throw;
+                // Соединение нерабочее
+                _isInitialized = false;
+                return false;
             }
-            catch (Exception ex)
+        }
+
+        private async Task<LdapConnection> GetValidConnectionAsync()
+        {
+            var connection = await GetConnectionAsync();
+
+            // Проверяем живое ли соединение
+            var isAlive = await IsConnectionAliveAsync();
+            if (!isAlive)
             {
-                _logger.LogError(ex, "Критическая ошибка при подключении к LDAP-серверу: {Server}:{Port}", server, port);
-                throw;
+                lock (_lock)
+                {
+                    // Сбрасываем флаг и пересоздаем соединение
+                    _isInitialized = false;
+                    _connection?.Dispose();
+                    _connection = null;
+                }
+
+                // Получаем новое соединение
+                connection = await GetConnectionAsync();
             }
+
+            return connection;
         }
 
         public async Task<User> GetUserBySamAccountNameAsync(string samAccountName)
         {
-            return await Task.Run(() =>
+            LdapConnection connection = null;
+
+            try
             {
-                LdapConnection connection = null;
-                try
+                connection = await GetValidConnectionAsync();
+                var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
+
+                // Экранируем специальные символы
+                var escapedSamAccountName = EscapeLdapFilter(samAccountName);
+                var searchFilter = $"(sAMAccountName={escapedSamAccountName})";
+
+                _logger.LogDebug("Поиск пользователя: {Filter} в {Base}", searchFilter, searchBase);
+
+                var attributes = new[] {
+                    "sAMAccountName", "displayName", "mail", "title", "department",
+                    "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
+                    "givenName", "sn", "initials", "whenCreated", "employeeID",
+                    "distinguishedName", "objectGUID", "userAccountControl",
+                    "company", "description", "officePhone", "mobile", "streetAddress",
+                    "postalCode", "co", "userPrincipalName", "memberOf"
+                };
+
+                var request = new SearchRequest(
+                    searchBase,
+                    searchFilter,
+                    SearchScope.Subtree,
+                    attributes
+                );
+
+                var response = (SearchResponse)connection.SendRequest(request);
+
+                if (response.Entries.Count > 0)
                 {
-                    connection = GetConnection();
-                    ConnectAndBind(connection);
+                    var entry = response.Entries[0];
+                    var user = MapLdapEntryToUser(entry);
 
-                    var searchFilter = $"(sAMAccountName={EscapeLdapFilter(samAccountName)})";
-                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
-                    var attributes = new[] {
-                        "sAMAccountName", "displayName", "mail", "title", "department",
-                        "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
-                        "givenName", "sn", "initials", "whenCreated", "employeeID",
-                        "distinguishedName", "objectGUID", "userAccountControl",
-                        "company", "description", "officePhone", "mobile", "streetAddress",
-                        "postalCode", "co", "userPrincipalName", "memberOf"
-                    };
-
-                    _logger.LogInformation("Поиск пользователя по sAMAccountName: {SamAccountName} в базе {SearchBase}", samAccountName, searchBase);
-
-                    var searchResults = connection.Search(
-                        searchBase,
-                        LdapConnection.SCOPE_SUB,
-                        searchFilter,
-                        attributes,
-                        false
-                    );
-
-                    if (searchResults.hasMore())
+                    if (user != null)
                     {
-                        var entry = searchResults.next();
-                        var user = MapLdapEntryToUser(entry);
-                        if (user != null)
-                        {
-                            _logger.LogInformation("Пользователь найден: {DisplayName} ({SamAccountName})", user.PersonalInfo?.First_name, user.SamAccountName);
-                            return user;
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Пользователь {SamAccountName} найден, но не прошёл фильтрацию (неактивен или некорректные данные)", samAccountName);
-                            return null;
-                        }
-                    }
-
-                    _logger.LogWarning("Пользователь с sAMAccountName={SamAccountName} не найден в LDAP", samAccountName);
-                    return null;
-                }
-                catch (LdapException ldapEx)
-                {
-                    _logger.LogError(ldapEx, "LDAP-ошибка при поиске пользователя {SamAccountName}: {ResultCode} {Message}", samAccountName, ldapEx.ResultCode, ldapEx.Message);
-                    return null;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Неизвестная ошибка при поиске пользователя {SamAccountName}", samAccountName);
-                    return null;
-                }
-                finally
-                {
-                    if (connection?.Connected == true)
-                    {
-                        connection.Disconnect();
-                        _logger.LogDebug("LDAP-соединение закрыто");
+                        _logger.LogInformation("Найден пользователь: {SamAccountName}", samAccountName);
+                        return user;
                     }
                 }
-            });
+
+                _logger.LogDebug("Пользователь {SamAccountName} не найден", samAccountName);
+                return null;
+            }
+            catch (DirectoryOperationException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при поиске пользователя {SamAccountName}: {Message}",
+                    samAccountName, ex.Message);
+                return null;
+            }
+            catch (LdapException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при поиске пользователя {SamAccountName}: {ErrorCode}",
+                    samAccountName, ex.ErrorCode);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Неизвестная ошибка при поиске пользователя {SamAccountName}",
+                    samAccountName);
+                return null;
+            }
         }
 
         public async Task<List<User>> GetUsersFromActiveDirectoryAsync()
         {
-            return await Task.Run(() =>
+            var users = new List<User>();
+            LdapConnection connection = null;
+
+            try
             {
-                var users = new List<User>();
-                LdapConnection connection = null;
+                connection = await GetValidConnectionAsync();
+                var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
+                var searchFilter = "(&(objectClass=user)(objectCategory=person))";
 
-                try
+                _logger.LogInformation("Начало массовой синхронизации из LDAP. База: {Base}", searchBase);
+
+                var attributes = new[] {
+                    "sAMAccountName", "displayName", "mail", "title", "department",
+                    "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
+                    "givenName", "sn", "initials", "whenCreated", "employeeID",
+                    "distinguishedName", "objectGUID", "userAccountControl",
+                    "company", "description", "officePhone", "mobile"
+                };
+
+                // Используем пейджинг для больших наборов данных
+                var pageSize = 1000;
+                byte[] pageCookie = null;
+                int processed = 0, skipped = 0;
+
+                do
                 {
-                    connection = GetConnection();
-                    ConnectAndBind(connection);
-
-                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
-                    var searchFilter = "(&(objectClass=user)(objectCategory=person))";
-
-                    _logger.LogInformation("Начало массовой синхронизации пользователей из LDAP. База: {SearchBase}, Фильтр: {SearchFilter}", searchBase, searchFilter);
-
-                    var searchResults = connection.Search(
+                    var request = new SearchRequest(
                         searchBase,
-                        LdapConnection.SCOPE_SUB,
                         searchFilter,
-                        new[] {
-                            "sAMAccountName", "displayName", "mail", "title", "department",
-                            "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
-                            "givenName", "sn", "initials", "whenCreated", "employeeID",
-                            "distinguishedName", "objectGUID", "userAccountControl",
-                            "company", "description", "officePhone", "mobile"
-                        },
-                        false
+                        SearchScope.Subtree,
+                        attributes
                     );
 
-                    int processed = 0, skipped = 0;
-                    while (searchResults.hasMore())
+                    // Добавляем контроль пейджинга
+                    var pageRequest = new PageResultRequestControl(pageSize);
+                    if (pageCookie != null)
+                    {
+                        pageRequest.Cookie = pageCookie;
+                    }
+                    request.Controls.Add(pageRequest);
+
+                    // Отправляем запрос
+                    var response = (SearchResponse)connection.SendRequest(request);
+
+                    // Обрабатываем результаты
+                    foreach (SearchResultEntry entry in response.Entries)
                     {
                         try
                         {
-                            var entry = searchResults.next();
                             var user = MapLdapEntryToUser(entry);
                             if (user != null)
                             {
@@ -183,206 +292,266 @@ namespace Infrastructure.ActiveDirectory
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Ошибка при обработке одного из LDAP-объектов (пропуск)");
+                            _logger.LogWarning(ex, "Ошибка при обработке записи LDAP");
                             skipped++;
                         }
                     }
 
-                    _logger.LogInformation("Синхронизация LDAP завершена: найдено {Processed} активных пользователей, пропущено {Skipped}", processed, skipped);
-                    return users;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Критическая ошибка при массовом получении пользователей из LDAP");
-                    throw;
-                }
-                finally
-                {
-                    if (connection?.Connected == true)
+                    // Получаем cookie для следующей страницы
+                    PageResultResponseControl pageResponse = null;
+                    foreach (DirectoryControl control in response.Controls)
                     {
-                        connection.Disconnect();
-                        _logger.LogDebug("LDAP-соединение закрыто после массовой синхронизации");
+                        if (control is PageResultResponseControl)
+                        {
+                            pageResponse = (PageResultResponseControl)control;
+                            break;
+                        }
                     }
-                }
-            });
+
+                    if (pageResponse != null)
+                    {
+                        pageCookie = pageResponse.Cookie;
+
+                        // Логируем прогресс
+                        if (processed % 1000 == 0)
+                        {
+                            _logger.LogInformation("Обработано {Processed} пользователей...", processed);
+                        }
+                    }
+                    else
+                    {
+                        pageCookie = null;
+                    }
+
+                } while (pageCookie != null && pageCookie.Length > 0);
+
+                _logger.LogInformation(
+                    "Синхронизация завершена: найдено {Processed} пользователей, пропущено {Skipped}",
+                    processed, skipped);
+
+                return users;
+            }
+            catch (DirectoryOperationException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при массовом получении пользователей: {Message}", ex.Message);
+                throw;
+            }
+            catch (LdapException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при массовом получении пользователей: {ErrorCode}", ex.ErrorCode);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Критическая ошибка при получении пользователей из LDAP");
+                throw;
+            }
         }
 
         public async Task<LdapHierarchyResponse> GetLdapHierarchyAsync()
         {
-            return await Task.Run(() =>
+            LdapConnection connection = null;
+
+            try
             {
-                LdapConnection connection = null;
-                try
+                connection = await GetValidConnectionAsync();
+                var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
+
+                _logger.LogInformation("Получение иерархии LDAP из {Base}", searchBase);
+
+                var response = new LdapHierarchyResponse();
+
+                // Получаем OU (организационные подразделения)
+                var ouRequest = new SearchRequest(
+                    searchBase,
+                    "(objectClass=organizationalUnit)",
+                    SearchScope.Subtree,
+                    new[] { "ou", "description", "distinguishedName" }
+                );
+
+                var ouResponse = (SearchResponse)connection.SendRequest(ouRequest);
+                foreach (SearchResultEntry entry in ouResponse.Entries)
                 {
-                    connection = GetConnection();
-                    ConnectAndBind(connection);
-
-                    var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
-                    _logger.LogInformation("Получение иерархии LDAP: поиск OUs и пользователей в базе {SearchBase}", searchBase);
-
-                    // Поиск организационных единиц
-                    var ouResults = connection.Search(
-                        searchBase,
-                        LdapConnection.SCOPE_SUB,
-                        "(objectClass=organizationalUnit)",
-                        new[] { "ou", "description", "distinguishedName" },
-                        false
-                    );
-
-                    var ous = new List<LdapOrganizationalUnit>();
-                    int ouCount = 0;
-                    while (ouResults.hasMore())
+                    response.OrganizationalUnits.Add(new LdapOrganizationalUnit
                     {
-                        try
-                        {
-                            var entry = ouResults.next();
-                            var attributes = entry.getAttributeSet();
+                        Name = GetAttributeValue(entry, "ou"),
+                        Description = GetAttributeValue(entry, "description"),
+                        DistinguishedName = GetAttributeValue(entry, "distinguishedName")
+                    });
+                }
 
-                            ous.Add(new LdapOrganizationalUnit
-                            {
-                                Name = LdapHelper.GetAttributeValue(attributes, "ou"),
-                                Description = LdapHelper.GetAttributeValue(attributes, "description"),
-                                DistinguishedName = LdapHelper.GetAttributeValue(attributes, "distinguishedName")
-                            });
-                            ouCount++;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Ошибка при обработке OU");
-                        }
+                // Получаем пользователей
+                var userRequest = new SearchRequest(
+                    searchBase,
+                    "(&(objectClass=user)(objectCategory=person))",
+                    SearchScope.Subtree,
+                    new[] {
+                        "sAMAccountName", "displayName", "title", "department",
+                        "manager", "distinguishedName", "userAccountControl",
+                        "givenName", "sn", "mail", "telephoneNumber", "physicalDeliveryOfficeName"
                     }
-                    _logger.LogDebug("Найдено {OuCount} организационных единиц", ouCount);
+                );
 
-                    // Поиск пользователей
-                    var userResults = connection.Search(
-                        searchBase,
-                        LdapConnection.SCOPE_SUB,
-                        "(&(objectClass=user)(objectCategory=person))",
-                        new[] {
-                            "sAMAccountName", "displayName", "title", "department",
-                            "manager", "distinguishedName", "userAccountControl",
-                            "givenName", "sn", "mail", "telephoneNumber", "physicalDeliveryOfficeName"
-                        },
-                        false
-                    );
+                var userResponse = (SearchResponse)connection.SendRequest(userRequest);
+                int inactiveSkipped = 0;
 
-                    var users = new List<LdapUserInfo>();
-                    int userCount = 0, inactiveSkipped = 0;
-                    while (userResults.hasMore())
+                foreach (SearchResultEntry entry in userResponse.Entries)
+                {
+                    var userAccountControl = GetAttributeValue(entry, "userAccountControl");
+                    if (!IsUserActive(userAccountControl))
                     {
-                        try
-                        {
-                            var entry = userResults.next();
-                            var attributes = entry.getAttributeSet();
-
-                            var userAccountControl = LdapHelper.GetAttributeValue(attributes, "userAccountControl");
-                            if (!LdapHelper.IsUserActive(userAccountControl))
-                            {
-                                inactiveSkipped++;
-                                continue;
-                            }
-
-                            users.Add(new LdapUserInfo
-                            {
-                                SamAccountName = LdapHelper.GetAttributeValue(attributes, "sAMAccountName"),
-                                DisplayName = LdapHelper.GetAttributeValue(attributes, "displayName"),
-                                FirstName = LdapHelper.GetAttributeValue(attributes, "givenName"),
-                                LastName = LdapHelper.GetAttributeValue(attributes, "sn"),
-                                Title = LdapHelper.GetAttributeValue(attributes, "title"),
-                                Department = LdapHelper.GetAttributeValue(attributes, "department"),
-                                Manager = LdapHelper.GetAttributeValue(attributes, "manager"),
-                                Email = LdapHelper.GetAttributeValue(attributes, "mail"),
-                                Phone = LdapHelper.GetAttributeValue(attributes, "telephoneNumber"),
-                                Office = LdapHelper.GetAttributeValue(attributes, "physicalDeliveryOfficeName"),
-                                DistinguishedName = LdapHelper.GetAttributeValue(attributes, "distinguishedName")
-                            });
-                            userCount++;
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Ошибка при обработке пользователя");
-                        }
+                        inactiveSkipped++;
+                        continue;
                     }
 
-                    _logger.LogInformation("Иерархия LDAP собрана: {UserCount} активных пользователей, {OuCount} OUs", userCount, ouCount);
+                    response.Users.Add(new LdapUserInfo
+                    {
+                        SamAccountName = GetAttributeValue(entry, "sAMAccountName"),
+                        DisplayName = GetAttributeValue(entry, "displayName"),
+                        FirstName = GetAttributeValue(entry, "givenName"),
+                        LastName = GetAttributeValue(entry, "sn"),
+                        Title = GetAttributeValue(entry, "title"),
+                        Department = GetAttributeValue(entry, "department"),
+                        Manager = GetAttributeValue(entry, "manager"),
+                        Email = GetAttributeValue(entry, "mail"),
+                        Phone = GetAttributeValue(entry, "telephoneNumber"),
+                        Office = GetAttributeValue(entry, "physicalDeliveryOfficeName"),
+                        DistinguishedName = GetAttributeValue(entry, "distinguishedName")
+                    });
+                }
 
-                    return new LdapHierarchyResponse
-                    {
-                        OrganizationalUnits = ous,
-                        Users = users,
-                        TotalUsers = userCount,
-                        TotalOUs = ouCount
-                    };
-                }
-                catch (Exception ex)
+                if (inactiveSkipped > 0)
                 {
-                    _logger.LogError(ex, "Ошибка при получении иерархии LDAP");
-                    throw;
+                    _logger.LogDebug("Пропущено {Count} неактивных пользователей", inactiveSkipped);
                 }
-                finally
-                {
-                    if (connection?.Connected == true)
-                    {
-                        connection.Disconnect();
-                        _logger.LogDebug("LDAP-соединение закрыто после получения иерархии");
-                    }
-                }
-            });
+
+                response.TotalUsers = response.Users.Count;
+                response.TotalOUs = response.OrganizationalUnits.Count;
+
+                _logger.LogInformation(
+                    "Иерархия собрана: {Users} пользователей, {OUs} OU",
+                    response.TotalUsers, response.TotalOUs);
+
+                return response;
+            }
+            catch (DirectoryOperationException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при получении иерархии: {Message}", ex.Message);
+                throw;
+            }
+            catch (LdapException ex)
+            {
+                _logger.LogError(ex, "Ошибка LDAP при получении иерархии: {ErrorCode}", ex.ErrorCode);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при получении иерархии LDAP");
+                throw;
+            }
         }
 
-        private User MapLdapEntryToUser(LdapEntry entry)
+        public async Task<bool> TestConnectionAsync()
         {
             try
             {
-                var attributes = entry.getAttributeSet();
-                var samAccountName = LdapHelper.GetAttributeValue(attributes, "sAMAccountName");
+                var connection = await GetValidConnectionAsync();
+
+                // Пробуем выполнить простой запрос к корню
+                var searchBase = _configuration["Ldap:SearchBase"] ?? "DC=stud,DC=local";
+                var request = new SearchRequest(
+                    searchBase,
+                    "(objectClass=*)",
+                    SearchScope.Base,
+                    new[] { "distinguishedName" }
+                );
+
+                var response = (SearchResponse)connection.SendRequest(request, TimeSpan.FromSeconds(10));
+
+                _logger.LogInformation("Тест подключения к LDAP: УСПЕШНО");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Тест подключения к LDAP: НЕУДАЧА");
+                return false;
+            }
+        }
+
+        public async Task<bool> TestCredentialsAsync(string username, string password)
+        {
+            try
+            {
+                var server = _configuration["Ldap:Server"] ?? "10.51.4.18";
+                var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
+
+                using (var testConnection = new LdapConnection(new LdapDirectoryIdentifier(server, port)))
+                {
+                    testConnection.Timeout = TimeSpan.FromSeconds(10);
+                    testConnection.SessionOptions.ProtocolVersion = 3;
+                    testConnection.SessionOptions.SecureSocketLayer = false;
+
+                    var credentials = new NetworkCredential(username, password);
+                    testConnection.Bind(credentials);
+
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private User MapLdapEntryToUser(SearchResultEntry entry)
+        {
+            try
+            {
+                var samAccountName = GetAttributeValue(entry, "sAMAccountName");
                 if (string.IsNullOrEmpty(samAccountName))
                 {
                     return null;
                 }
 
-                var userAccountControl = LdapHelper.GetAttributeValue(attributes, "userAccountControl");
-                var isActive = LdapHelper.IsUserActive(userAccountControl);
-                if (!isActive)
+                var userAccountControl = GetAttributeValue(entry, "userAccountControl");
+                if (!IsUserActive(userAccountControl))
                 {
-                    _logger.LogDebug("Пропуск: пользователь {SamAccountName} неактивен (userAccountControl={UserAccountControl})", samAccountName, userAccountControl);
+                    _logger.LogTrace("Пропуск неактивного пользователя: {SamAccountName}", samAccountName);
                     return null;
                 }
 
-                var whenCreated = LdapHelper.ParseLdapDate(LdapHelper.GetAttributeValue(attributes, "whenCreated"));
-
-                _logger.LogTrace("Создание пользователя из LDAP: {SamAccountName}", samAccountName);
+                var whenCreated = ParseLdapDate(GetAttributeValue(entry, "whenCreated"));
 
                 return new User
                 {
                     SamAccountName = samAccountName,
-                    Email = LdapHelper.GetAttributeValue(attributes, "mail") ?? LdapHelper.GetAttributeValue(attributes, "userPrincipalName"),
+                    Email = GetAttributeValue(entry, "mail") ?? GetAttributeValue(entry, "userPrincipalName"),
                     Login = samAccountName,
                     Password = "LDAP_SYNCED_USER",
                     IsActive = true,
                     LastAdSync = DateTime.UtcNow,
                     PersonalInfo = new PersonalInfo
                     {
-                        Last_name = LdapHelper.GetAttributeValue(attributes, "sn") ?? "",
-                        First_name = LdapHelper.GetAttributeValue(attributes, "givenName") ??
-                                    LdapHelper.GetAttributeValue(attributes, "displayName")?.Split(' ')[0] ?? "",
-                        Patronymic = LdapHelper.GetAttributeValue(attributes, "initials") ?? "",
+                        Last_name = GetAttributeValue(entry, "sn") ?? "",
+                        First_name = GetAttributeValue(entry, "givenName") ??
+                                    GetAttributeValue(entry, "displayName")?.Split(' ')[0] ?? "",
+                        Patronymic = GetAttributeValue(entry, "initials") ?? "",
                         Birth_date = whenCreated?.AddYears(-25) ?? DateTime.UtcNow.AddYears(-25),
-                        Interests = LdapHelper.GetAttributeValue(attributes, "description") ?? ""
+                        Interests = GetAttributeValue(entry, "description") ?? ""
                     },
                     WorkInfo = new WorkInfo
                     {
-                        Position = LdapHelper.GetAttributeValue(attributes, "title") ?? "Employee",
-                        Department = LdapHelper.GetAttributeValue(attributes, "department") ?? "General",
+                        Position = GetAttributeValue(entry, "title") ?? "Employee",
+                        Department = GetAttributeValue(entry, "department") ?? "General",
                         Work_exp = whenCreated ?? DateTime.UtcNow.AddYears(-1)
                     },
                     ContactInfo = new ContactInfo
                     {
-                        Phone = LdapHelper.GetAttributeValue(attributes, "telephoneNumber") ??
-                               LdapHelper.GetAttributeValue(attributes, "officePhone") ?? "",
-                        City = LdapHelper.GetAttributeValue(attributes, "l") ??
-                              LdapHelper.GetAttributeValue(attributes, "co") ??
-                              LdapHelper.GetAttributeValue(attributes, "physicalDeliveryOfficeName") ?? ""
+                        Phone = GetAttributeValue(entry, "telephoneNumber") ??
+                               GetAttributeValue(entry, "officePhone") ?? "",
+                        City = GetAttributeValue(entry, "l") ??
+                              GetAttributeValue(entry, "co") ??
+                              GetAttributeValue(entry, "physicalDeliveryOfficeName") ?? ""
                     },
                     Created_at = DateTime.UtcNow,
                     Updated_at = DateTime.UtcNow
@@ -390,20 +559,119 @@ namespace Infrastructure.ActiveDirectory
             }
             catch (Exception ex)
             {
+                _logger.LogDebug(ex, "Ошибка при маппинге пользователя из LDAP");
                 return null;
             }
         }
+
+        #region Helper Methods
 
         private string EscapeLdapFilter(string filter)
         {
             if (string.IsNullOrEmpty(filter)) return string.Empty;
 
-            return filter
+            // Экранирование специальных символов для LDAP фильтров
+            var result = filter
                 .Replace("\\", "\\5c")
                 .Replace("*", "\\2a")
                 .Replace("(", "\\28")
                 .Replace(")", "\\29")
                 .Replace("\0", "\\00");
+
+            return result;
         }
+
+        private string GetAttributeValue(SearchResultEntry entry, string attributeName)
+        {
+            try
+            {
+                if (entry.Attributes.Contains(attributeName))
+                {
+                    var attribute = entry.Attributes[attributeName];
+                    if (attribute != null && attribute.Count > 0)
+                    {
+                        return attribute[0]?.ToString();
+                    }
+                }
+            }
+            catch
+            {
+                // Игнорируем ошибки получения атрибутов
+            }
+            return null;
+        }
+
+        private bool IsUserActive(string userAccountControl)
+        {
+            if (string.IsNullOrEmpty(userAccountControl))
+                return false;
+
+            if (int.TryParse(userAccountControl, out int uac))
+            {
+                const int disabledFlag = 2; // ADS_UF_ACCOUNTDISABLE
+                const int lockedFlag = 16; // ADS_UF_LOCKOUT
+                const int passwordExpiredFlag = 8388608; // ADS_UF_PASSWORD_EXPIRED
+
+                return (uac & disabledFlag) == 0 &&
+                       (uac & lockedFlag) == 0 &&
+                       (uac & passwordExpiredFlag) == 0;
+            }
+
+            return false;
+        }
+
+        private DateTime? ParseLdapDate(string ldapDate)
+        {
+            if (string.IsNullOrEmpty(ldapDate) || ldapDate.Length < 14)
+                return null;
+
+            try
+            {
+                // Формат LDAP: yyyyMMddHHmmss.0Z
+                var year = int.Parse(ldapDate.Substring(0, 4));
+                var month = int.Parse(ldapDate.Substring(4, 2));
+                var day = int.Parse(ldapDate.Substring(6, 2));
+                var hour = int.Parse(ldapDate.Substring(8, 2));
+                var minute = int.Parse(ldapDate.Substring(10, 2));
+                var second = int.Parse(ldapDate.Substring(12, 2));
+
+                return new DateTime(year, month, day, hour, minute, second, DateTimeKind.Utc);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
+
+        #region IDisposable Implementation
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Освобождаем управляемые ресурсы
+                    if (_connection != null)
+                    {
+                        _connection.Dispose();
+                        _connection = null;
+                    }
+                }
+
+                _disposed = true;
+                _isInitialized = false;
+            }
+        }
+
+        #endregion
     }
 }

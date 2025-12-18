@@ -40,6 +40,13 @@ namespace API.Controllers
             }
         }
 
+        [HttpGet("test")]
+        public async Task<IActionResult> TestConnection()
+        {
+            var isConnected = await _ldapService.TestConnectionAsync();
+            return Ok(new { connected = isConnected });
+        }
+
         /// <summary>
         /// Получает список всех пользователей из Active Directory.
         /// </summary>
