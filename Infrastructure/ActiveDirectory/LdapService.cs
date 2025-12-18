@@ -216,25 +216,48 @@ namespace Infrastructure.ActiveDirectory
 
             try
             {
+                _logger.LogInformation("Начало массовой синхронизации пользователей из Active Directory");
+
+                _logger.LogDebug("Попытка получить или создать LDAP-соединение");
                 connection = GetOrCreateConnection();
+
+                if (connection == null)
+                {
+                    _logger.LogError("GetOrCreateConnection вернул null");
+                    throw new InvalidOperationException("Не удалось создать соединение с LDAP-сервером.");
+                }
+
+                _logger.LogDebug("Состояние соединения до подключения: Connected={Connected}, Bound={Bound}",
+                    connection.Connected, connection.Bound);
 
                 if (!connection.Connected)
                 {
+                    _logger.LogInformation("Соединение с LDAP не установлено. Выполняется подключение...");
                     Connect(connection);
+                    _logger.LogInformation("Подключение к LDAP успешно выполнено");
+                }
+                else
+                {
+                    _logger.LogDebug("Используется существующее соединение");
                 }
 
                 var filter = "(&(objectClass=user)(objectCategory=person))";
 
                 _logger.LogInformation("Начало массовой синхронизации пользователей");
+                _logger.LogDebug("Применяемый фильтр поиска: {Filter}", filter);
+                _logger.LogDebug("База поиска: {SearchBase}", _searchBase);
 
                 var attributes = new[] {
-                    "sAMAccountName", "displayName", "mail", "title", "department",
-                    "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
-                    "givenName", "sn", "initials", "whenCreated", "employeeID",
-                    "distinguishedName", "objectGUID", "userAccountControl",
-                    "company", "description", "officePhone", "mobile"
-                };
+            "sAMAccountName", "displayName", "mail", "title", "department",
+            "manager", "telephoneNumber", "l", "physicalDeliveryOfficeName",
+            "givenName", "sn", "initials", "whenCreated", "employeeID",
+            "distinguishedName", "objectGUID", "userAccountControl",
+            "company", "description", "officePhone", "mobile"
+        };
 
+                _logger.LogDebug("Запрашиваемые атрибуты: {Attributes}", string.Join(", ", attributes));
+
+                _logger.LogInformation("Выполняется асинхронный запрос к LDAP: SearchAsync");
                 var taskRes = connection.SearchAsync(
                     _searchBase,
                     LdapConnection.ScopeSub,
@@ -247,18 +270,34 @@ namespace Infrastructure.ActiveDirectory
                         ServerTimeLimit = 0
                     });
 
+                _logger.LogDebug("SearchAsync вызван. Ожидание завершения задачи...");
                 var results = await taskRes;
-                
+                _logger.LogInformation("Получен результат поиска. Начало обработки записей");
 
                 int processed = 0, skipped = 0;
+                int entryIndex = 0;
 
                 try
                 {
                     while (results.HasMoreAsync().Result)
                     {
+                        entryIndex++;
+                        _logger.LogDebug("Обработка записи #{EntryIndex}", entryIndex);
+
                         try
                         {
+                            _logger.LogDebug("Чтение следующей записи через NextAsync()");
                             var entry = results.NextAsync().Result;
+
+                            if (entry == null)
+                            {
+                                _logger.LogWarning("Получена null-запись при чтении записи #{EntryIndex}", entryIndex);
+                                skipped++;
+                                continue;
+                            }
+
+                            _logger.LogDebug("Получена запись: DN={DN}", entry.Dn);
+
                             var user = MapLdapEntryToUser(entry);
 
                             if (user != null)
@@ -274,19 +313,30 @@ namespace Infrastructure.ActiveDirectory
                             else
                             {
                                 skipped++;
+                                _logger.LogDebug("Пользователь пропущен (не прошёл маппинг): DN={DN}", entry.Dn);
                             }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "Ошибка при обработке записи");
+                            _logger.LogWarning(ex, "Ошибка при обработке записи #{EntryIndex}", entryIndex);
                             skipped++;
                         }
                     }
+
+                    _logger.LogInformation("Завершено чтение всех доступных записей. Всего обработано записей: {EntryIndex}", entryIndex);
                 }
                 finally
                 {
-                    taskRes.Dispose();
-
+                    _logger.LogDebug("Освобождение ресурсов: вызов Dispose() для результата поиска");
+                    try
+                    {
+                        taskRes.Dispose();
+                        _logger.LogDebug("Ресурсы поиска успешно освобождены");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Ошибка при освобождении ресурсов поиска");
+                    }
                 }
 
                 _logger.LogInformation(
@@ -297,7 +347,22 @@ namespace Infrastructure.ActiveDirectory
             }
             catch (LdapException ex)
             {
-                _logger.LogError(ex, "LDAP ошибка при массовом получении пользователей: {ResultCode}", ex.ResultCode);
+                _logger.LogError(ex, "LDAP ошибка при массовом получении пользователей: {ResultCode} — {Message}",
+                    ex.ResultCode, ex.Message);
+                throw;
+            }
+            catch (AggregateException aggEx)
+            {
+                _logger.LogError(aggEx, "AggregateException при выполнении асинхронного LDAP-запроса");
+                foreach (var inner in aggEx.InnerExceptions)
+                {
+                    _logger.LogError(inner, "Внутреннее исключение в AggregateException");
+                }
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogError(ex, "Задача LDAP-поиска была отменена (таймаут или отмена)");
                 throw;
             }
             catch (Exception ex)
@@ -306,6 +371,8 @@ namespace Infrastructure.ActiveDirectory
                 throw;
             }
         }
+
+
 
         public async Task<LdapHierarchyResponse> GetLdapHierarchyAsync()
         {
