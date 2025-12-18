@@ -27,27 +27,15 @@ namespace Infrastructure.ActiveDirectory
 
         private async Task<LdapConnection> GetConnectionAsync()
         {
-            // Используем двойную проверку для потокобезопасности
-            if (_connection != null && _isInitialized)
-            {
-                return _connection;
-            }
-
             lock (_lock)
             {
-                if (_connection != null && _isInitialized)
+                if (_connection != null)
                 {
                     return _connection;
                 }
 
                 try
                 {
-                    // Закрываем старое соединение если есть
-                    if (_connection != null)
-                    {
-                        _connection.Dispose();
-                    }
-
                     var server = _configuration["Ldap:Server"] ?? "10.51.4.18";
                     var port = int.Parse(_configuration["Ldap:Port"] ?? "389");
                     var username = _configuration["Ldap:Username"] ?? "STUD\\Administrator";
@@ -58,25 +46,24 @@ namespace Infrastructure.ActiveDirectory
                         server, port, username);
 
                     // Создаем идентификатор сервера
-                    var identifier = new LdapDirectoryIdentifier(server, port);
+                    var identifier = new LdapDirectoryIdentifier(server, port, false, false);
 
-                    // Создаем соединение
+                    // Создаем соединение БЕЗ AutoBind
                     _connection = new LdapConnection(identifier)
                     {
                         Timeout = TimeSpan.FromSeconds(30),
-                        AutoBind = false
+                        AutoBind = false // Важно: отключаем авто-биндинг
                     };
 
                     // Настраиваем параметры сессии
                     _connection.SessionOptions.ProtocolVersion = 3;
-                    _connection.SessionOptions.SecureSocketLayer = false;
+                    _connection.SessionOptions.SecureSocketLayer = false; // false для порта 389
 
-                    // Отключаем проверку сертификатов если используем LDAPS
-                    _connection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
+                    // НЕ устанавливаем VerifyServerCertificate для незашифрованного соединения
+                    // _connection.SessionOptions.VerifyServerCertificate = (conn, cert) => true;
 
-                    // Настраиваем кэширование
+                    // Другие настройки
                     _connection.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
-                    _connection.SessionOptions.ReferralHopLimit = 1;
 
                     // Создаем учетные данные
                     var credentials = new NetworkCredential(username, password);
@@ -84,9 +71,7 @@ namespace Infrastructure.ActiveDirectory
                     // Подключаемся и аутентифицируемся
                     _connection.Bind(credentials);
 
-                    _isInitialized = true;
                     _logger.LogInformation("LDAP подключение успешно установлено");
-
                     return _connection;
                 }
                 catch (LdapException ex)
@@ -94,7 +79,6 @@ namespace Infrastructure.ActiveDirectory
                     _logger.LogError(ex, "Ошибка LDAP при создании подключения. Код ошибки: {ErrorCode}", ex.ErrorCode);
                     _connection?.Dispose();
                     _connection = null;
-                    _isInitialized = false;
                     throw;
                 }
                 catch (Exception ex)
@@ -102,7 +86,6 @@ namespace Infrastructure.ActiveDirectory
                     _logger.LogError(ex, "Неизвестная ошибка при создании LDAP подключения");
                     _connection?.Dispose();
                     _connection = null;
-                    _isInitialized = false;
                     throw;
                 }
             }
