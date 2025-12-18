@@ -28,7 +28,7 @@ namespace Application.Dtos
         public string? hierarchyColor { get; set; }
     }
 
-   
+
 
     public class SynchroResponseDto
     {
