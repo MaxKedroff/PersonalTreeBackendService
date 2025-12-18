@@ -55,6 +55,14 @@ namespace Infrastructure.Data
                 entity.ToTable("users");
                 entity.HasKey(e => e.User_id);
 
+                entity.Property(e => e.Avatar)
+              .HasColumnName("avatar")
+              .HasDefaultValue(string.Empty);
+
+                entity.Property(e => e.NewAvatar)
+                      .HasColumnName("new_avatar")
+                      .HasDefaultValue(string.Empty);
+
                 entity.HasOne(u => u.Hierarchy)
                       .WithMany()
                       .HasForeignKey(u => u.HierarchyId)

@@ -24,7 +24,10 @@ namespace Domain.Entities
         public string Password { get; set; }
         public int? HierarchyId { get; set; }
         public Guid? Manager_id { get; set; }
-        public string Role { get; set; } = AuthOptions.ROLE_USER; 
+        public string Role { get; set; } = AuthOptions.ROLE_USER;
+        public string? Avatar { get; set; }
+
+        public string? NewAvatar { get; set; }
         public PersonalInfo PersonalInfo { get; set; } = new PersonalInfo();
         public WorkInfo WorkInfo { get; set; } = new WorkInfo();
         public ContactInfo ContactInfo { get; set; } = new ContactInfo();

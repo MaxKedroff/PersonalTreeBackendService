@@ -265,6 +265,8 @@ namespace Application.Services
                 IsActive = dto.IsActive,
                 LastAdSync = dto.LastAdSync,
                 AdGuid = dto.AdGuid,
+                Avatar = null, // или string.Empty если нужно
+                NewAvatar = null, // или string.Empty если нужно
                 Created_at = DateTime.UtcNow,
                 Updated_at = DateTime.UtcNow
             };
