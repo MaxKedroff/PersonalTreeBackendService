@@ -37,6 +37,7 @@ namespace Application.Utils
             services.AddScoped<ILdapService, LdapService>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISkillService, SkillService>();
+            services.AddScoped<ISynchronizationService, SynchronizationService>();
             return services;
         }
     }

@@ -29,7 +29,7 @@ namespace API.Controllers
 
 
 
-        [HttpGet("sync-ldap")]
+        [HttpPost("sync-ldap")]
         public async Task<ActionResult<SynchroResponseDto>> SyncLdap([FromBody] SynchroRequestDto request)
         {
             try
