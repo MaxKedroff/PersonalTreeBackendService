@@ -9,7 +9,7 @@ namespace Infrastructure.ActiveDirectory
         {
             try
             {
-                var attribute = attributes.getAttribute(attributeName);
+                var attribute = attributes.GetAttribute(attributeName);
                 return attribute?.StringValue;
             }
             catch
