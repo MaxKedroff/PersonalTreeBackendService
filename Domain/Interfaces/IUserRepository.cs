@@ -36,5 +36,9 @@ namespace Domain.Interfaces
 
         Task<List<string>> GetSkillsByUser(Guid UserId);
 
+
+        Task AddAsync(User user);
+        void Update(User user);
+        void Delete(User user);
     }
 }

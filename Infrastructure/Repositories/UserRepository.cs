@@ -356,5 +356,50 @@ namespace Infrastructure.Repositories
                                          u.Manager_id == null &&
                                          u.IsActive);
         }
+
+        public async Task AddAsync(User user)
+        {
+            try
+            {
+
+                user.Created_at = DateTime.UtcNow;
+                user.Updated_at = DateTime.UtcNow;
+
+                await _context.Users.AddAsync(user);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
+        public void Update(User user)
+        {
+            try
+            {
+
+                user.Updated_at = DateTime.UtcNow;
+
+                
+
+                _context.Users.Update(user);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
+
+        public void Delete(User user)
+        {
+            try
+            {
+                _context.Users.Remove(user);
+            }
+            catch (Exception ex)
+            {
+                throw;
+            }
+        }
     }
 }

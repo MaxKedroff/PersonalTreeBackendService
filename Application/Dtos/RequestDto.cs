@@ -92,4 +92,66 @@ namespace Application.Dtos
         public string Position { get; set; }
         public string AvatarUrl { get; set; }
     }
+
+
+    public class SynchroRequestDto
+    {
+        public int count;
+        public bool isHardSynchronize;
+        public List<UserToSynchronizeDto> users;
+    }
+
+    public class UserToSynchronizeDto
+    {
+        // Базовые данные пользователя
+        public string Login { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string SamAccountName { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+
+        // AD идентификаторы
+        public string AdGuid { get; set; } = string.Empty;
+        public string AdObjectGuidBase64 { get; set; } = string.Empty;
+        public string AdDistinguishedName { get; set; } = string.Empty;
+        public string AdEmployeeId { get; set; } = string.Empty;
+        public string AdWhenCreated { get; set; } = string.Empty;
+
+        // Личная информация
+        public PersonalInfoDto PersonalInfo { get; set; } = new PersonalInfoDto();
+
+        // Рабочая информация
+        public WorkInfoDto WorkInfo { get; set; } = new WorkInfoDto();
+
+        // Контактная информация
+        public ContactInfoDto ContactInfo { get; set; } = new ContactInfoDto();
+
+        // Связи
+        public string ManagerSamAccountName { get; set; } = string.Empty;
+        public string ManagerAdGuid { get; set; } = string.Empty;
+
+        // Метаданные синхронизации
+        public DateTime LastAdSync { get; set; }
+    }
+
+    public class PersonalInfoDto
+    {
+        public string LastName { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string Patronymic { get; set; } = string.Empty;
+        public DateTime? BirthDate { get; set; }
+        public string Interests { get; set; } = string.Empty;
+    }
+
+    public class WorkInfoDto
+    {
+        public string Position { get; set; } = string.Empty;
+        public string Department { get; set; } = string.Empty;
+        public DateTime? WorkExp { get; set; }
+    }
+
+    public class ContactInfoDto
+    {
+        public string Phone { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+    }
 }

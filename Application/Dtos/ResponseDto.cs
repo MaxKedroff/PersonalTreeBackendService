@@ -28,6 +28,20 @@ namespace Application.Dtos
         public string? hierarchyColor { get; set; }
     }
 
+   
+
+    public class SynchroResponseDto
+    {
+        public string Status { get; set; } = "success";
+        public int AddedUsers { get; set; }
+        public int UpdatedUsers { get; set; }
+        public int DeactivatedUsers { get; set; }
+        public int DeletedUsers { get; set; }
+        public int TotalProcessed { get; set; }
+        public List<string> Errors { get; set; } = new List<string>();
+        public DateTime SyncTimestamp { get; set; } = DateTime.UtcNow;
+    }
+
 
     public class UserDetailInfoDto
     {
