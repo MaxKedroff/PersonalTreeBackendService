@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Infrastructure.ActiveDirectory
 {
@@ -161,13 +162,15 @@ namespace Infrastructure.ActiveDirectory
                     "postalCode", "co", "userPrincipalName", "memberOf"
                 };
 
-                var results = connection.SearchAsync(
+                var taskRes = connection.SearchAsync(
                     _searchBase,
                     LdapConnection.ScopeSub,
                     filter,
                     attributes,
                     false
-                ).Result;
+                );
+
+                var results = await taskRes;
 
                 
 
@@ -190,7 +193,7 @@ namespace Infrastructure.ActiveDirectory
                 }
                 finally
                 {
-                    
+                    taskRes.Dispose();
                 }
             }
             catch (LdapException ex)
@@ -232,7 +235,7 @@ namespace Infrastructure.ActiveDirectory
                     "company", "description", "officePhone", "mobile"
                 };
 
-                var results = await connection.SearchAsync(
+                var taskRes = connection.SearchAsync(
                     _searchBase,
                     LdapConnection.ScopeSub,
                     filter,
@@ -242,8 +245,10 @@ namespace Infrastructure.ActiveDirectory
                     {
                         BatchSize = 1000,
                         ServerTimeLimit = 0
-                    }
-                );
+                    });
+
+                var results = await taskRes;
+                
 
                 int processed = 0, skipped = 0;
 
@@ -280,6 +285,8 @@ namespace Infrastructure.ActiveDirectory
                 }
                 finally
                 {
+                    taskRes.Dispose();
+
                 }
 
                 _logger.LogInformation(
@@ -317,14 +324,16 @@ namespace Infrastructure.ActiveDirectory
 
                 var response = new LdapHierarchyResponse();
 
-                // Получаем OU
-                var ouResults = connection.SearchAsync(
+                var taskRes = connection.SearchAsync(
                     _searchBase,
                     LdapConnection.ScopeSub,
                     "(objectClass=organizationalUnit)",
                     new[] { "ou", "description", "distinguishedName" },
                     false
-                ).Result;
+                );
+
+                // Получаем OU
+                var ouResults = taskRes.Result;
 
                 try
                 {
@@ -350,10 +359,10 @@ namespace Infrastructure.ActiveDirectory
                 }
                 finally
                 {
+                    taskRes.Dispose();
                 }
 
-                // Получаем пользователей
-                var userResults = connection.SearchAsync(
+                var taskUsers = connection.SearchAsync(
                     _searchBase,
                     LdapConnection.ScopeSub,
                     "(&(objectClass=user)(objectCategory=person))",
@@ -363,7 +372,9 @@ namespace Infrastructure.ActiveDirectory
                         "givenName", "sn", "mail", "telephoneNumber", "physicalDeliveryOfficeName"
                     },
                     false
-                ).Result;
+                );
+                // Получаем пользователей
+                var userResults = taskUsers.Result;
 
                 int inactiveSkipped = 0;
 
@@ -407,6 +418,7 @@ namespace Infrastructure.ActiveDirectory
                 }
                 finally
                 {
+                    taskUsers.Dispose();
                 }
 
                 response.TotalUsers = response.Users.Count;
@@ -440,15 +452,15 @@ namespace Infrastructure.ActiveDirectory
                 {
                     await testConnection.ConnectAsync(_server, _port);
                     await testConnection.BindAsync(_username, _password);
-
-                    // Пробуем выполнить простой запрос
-                    var results = testConnection.SearchAsync(
+                    var taskRes = testConnection.SearchAsync(
                         _searchBase,
                         LdapConnection.ScopeBase,
                         "(objectClass=*)",
                         new[] { "distinguishedName" },
                         false
-                    ).Result;
+                    );
+                    // Пробуем выполнить простой запрос
+                    var results = taskRes.Result;
 
                     try
                     {
@@ -459,6 +471,7 @@ namespace Infrastructure.ActiveDirectory
                     }
                     finally
                     {
+                        taskRes.Dispose();
                     }
 
                     testConnection.Disconnect();
