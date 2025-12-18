@@ -38,6 +38,7 @@ namespace Application.Utils
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ISkillService, SkillService>();
             services.AddScoped<ISynchronizationService, SynchronizationService>();
+            services.AddScoped<IUnitOfWork, UnitOfWork>();
             return services;
         }
     }
