@@ -46,20 +46,21 @@ namespace Application.Services
             {
                 _logger.LogInformation("Начало мягкой синхронизации. Пользователей для обработки: {Count}", dto.count);
                 var dbUsers = await _userRepository.GetUsersAsync();
+
+                // Словарь только по AdGuid - он должен быть уникальным
                 var dbUsersByAdGuid = dbUsers
                     .Where(u => !string.IsNullOrEmpty(u.AdGuid))
                     .ToDictionary(u => u.AdGuid, u => u);
 
-                var dbUsersBySamAccount = dbUsers
-                    .Where(u => !string.IsNullOrEmpty(u.SamAccountName))
-                    .ToDictionary(u => u.SamAccountName, u => u);
+                // НЕ создаем словарь по SamAccountName, чтобы избежать конфликтов
+                // Вместо этого используем список или FirstOrDefault
 
                 var managerMap = new Dictionary<string, Guid>();
                 foreach (var user in dbUsers)
                 {
                     if (!string.IsNullOrEmpty(user.AdGuid))
                     {
-                        managerMap[user.AdGuid] = user.Manager_id.Value;
+                        managerMap[user.AdGuid] = user.Manager_id ?? Guid.Empty;
                     }
                 }
 
@@ -72,20 +73,37 @@ namespace Application.Services
                             _logger.LogWarning("Пропуск пользователя без AD GUID: {SamAccountName}", userDto.SamAccountName);
                             continue;
                         }
+
                         if (dbUsersByAdGuid.TryGetValue(userDto.AdGuid, out var existingUser))
                         {
-                            _logger.LogWarning("юзер существует", userDto.SamAccountName);
+                            _logger.LogInformation("Пользователь с AD GUID {AdGuid} уже существует: {SamAccountName}",
+                                userDto.AdGuid, userDto.SamAccountName);
+                            // Пользователь уже есть - ничего не делаем для мягкой синхронизации
                         }
                         else
                         {
-                            //if (dbUsersBySamAccount.TryGetValue(userDto.SamAccountName, out var userBySam))
-                            //{
-                            //    userBySam.AdGuid = userDto.AdGuid;
-                            //    await UpdateUser(userBySam, userDto, managerMap);
-                            //    response.UpdatedUsers++;
-                            //}
-                            await CreateNewUser(userDto, managerMap);
-                            response.AddedUsers++;
+                            // Ищем пользователя по SamAccountName (если нужно)
+                            var userBySam = dbUsers.FirstOrDefault(u =>
+                                u.SamAccountName == userDto.SamAccountName &&
+                                string.IsNullOrEmpty(u.AdGuid));
+
+                            if (userBySam != null)
+                            {
+                                // Нашли пользователя без AdGuid - обновляем его
+                                userBySam.AdGuid = userDto.AdGuid;
+                                await UpdateUser(userBySam, userDto, managerMap);
+                                response.UpdatedUsers++;
+                                _logger.LogInformation("Обновлен пользователь без AdGuid: {SamAccountName}",
+                                    userDto.SamAccountName);
+                            }
+                            else
+                            {
+                                // Создаем нового пользователя
+                                await CreateNewUser(userDto, managerMap);
+                                response.AddedUsers++;
+                                _logger.LogInformation("Создан новый пользователь: {SamAccountName}",
+                                    userDto.SamAccountName);
+                            }
                         }
 
                         response.TotalProcessed++;
@@ -103,7 +121,6 @@ namespace Application.Services
                     response.AddedUsers, response.UpdatedUsers, response.TotalProcessed);
 
                 response.Status = "success";
-
             }
             catch (Exception ex)
             {
