@@ -77,7 +77,7 @@ namespace Application.Services
                         .GroupBy(u => u.WorkInfo.Department)
                         .Select(g => new DepartmentHierarchyDto
                         {
-                            Department = g.Key,
+                            Department = g.Key.Split("(")[0],
                             Employees = g.Where(u => u.Manager_id == ceo?.User_id ||
                                            !allUsers.Any(m => m.User_id == u.Manager_id && m.WorkInfo?.Department == g.Key))
                                 .Select(emp => Mapper.MapEmployeeToHierarchyDto(emp, allUsers))
@@ -419,6 +419,7 @@ namespace Application.Services
                 if (hierarchyDict.TryGetValue(h.ParentId.Value, out var parent) &&
             hierarchyDict.TryGetValue(h.HierarchyId, out var child))
                 {
+                    child.Title = child.Title.Split("(")[0];
                     parent.Children.Add(child);
                 }
             }
