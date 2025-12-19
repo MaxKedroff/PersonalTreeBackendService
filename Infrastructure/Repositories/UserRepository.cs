@@ -210,7 +210,12 @@ namespace Infrastructure.Repositories
                          u.PersonalInfo.Patronymic.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ||
                          (!string.IsNullOrEmpty(u.GetFullName()) &&
              u.GetFullName().Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                    ) ||
+                        (u.Skills != null && u.Skills.Any(skill =>
+                        !string.IsNullOrEmpty(skill) &&
+                        skill.ToLower().Contains(searchText)
                     ))
+                    )
                 );
                 Console.WriteLine($"After search text filter: {filteredUsers.Count()} users");
             }
