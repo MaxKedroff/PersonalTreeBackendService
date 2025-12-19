@@ -48,7 +48,8 @@ namespace Application.Utils
                 UserName = user.GetFullName(),
                 UserId = user.User_id,
                 Position = user.WorkInfo.Position,
-                Department = user.WorkInfo.Department
+                Department = user.WorkInfo.Department,
+                skills = user.Skills
             };
         }
 

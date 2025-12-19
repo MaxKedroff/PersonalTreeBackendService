@@ -26,6 +26,8 @@ namespace Application.Dtos
         public string? Department { get; set; }
         public Guid UserId { get; set; }
         public string? hierarchyColor { get; set; }
+
+        public string[]? skills { get; set; } 
     }
 
 
