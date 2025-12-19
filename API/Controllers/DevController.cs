@@ -76,5 +76,11 @@ namespace API.Controllers
                 return BadRequest("произошла какая то ошибка: " + e);
             }
         }
+
+        [HttpGet("hierarchies")]
+        public List<string> GetHierarchyList()
+        {
+           return _context.Hierarchies.Where(el => el.LevelHierarchy > 3).Select(el => el.TitleHierarchy).ToList();
+        } 
     }
 }
